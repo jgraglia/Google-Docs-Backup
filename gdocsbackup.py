@@ -19,11 +19,6 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 	if not feed.entry:
 			print 'No entries in feed - Nothing to backup!\n'
 	for entry in feed.entry:
-		#print entry.title.text.encode('UTF-8'), entry.GetDocumentType(), entry.resource_id.text
-		#print "Dans les répertoires suivant : "
-		## List folders the document is in.
-		#for folder in entry.InFolders():
-		#	print " - > "+folder.title
 		ext = ".pdf"
 		dl=False
 		if entry.GetDocumentType()== "document" :
@@ -130,9 +125,3 @@ if __name__ == '__main__':
 	#client.auth_token = gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken())
 	downloadFeed(client, client.auth_token, gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken()), feed, folder, args.flat)
 	print "    -> SUCCESS"
-
-	#print document_entry.title.text
-	#file_path = 'C:\google_docs_backup\file.doc'
-		#print 'Exporting document to ' + file_path
-		#print 'Exported %s as a .doc file' % document_entry.title.text
-
