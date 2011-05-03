@@ -41,21 +41,12 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 		else:
 			raise Exception("ERROR !!!!!!!! Type de document non géré : "+entry.GetDocumentType())
 		filenameToCreate= computeFileNameFor(entry, ext)
-		if storeFlat == False:
-			firstFolder=getFirstCollectionFolderFor(entry)
-			if firstFolder==None:
-				file = os.path.join(os.path.abspath(storeFolder), filenameToCreate)
-			else:				
-				colFolder = os.path.join(os.path.abspath(storeFolder), firstFolder.title)
-				forceFolder(colFolder)
-				file = os.path.join(os.path.abspath(colFolder), filenameToCreate)
-		else:
-			file = os.path.join(os.path.abspath(storeFolder), filenameToCreate)
+		file = computeFileForEntry(storeFolder, entry, filenameToCreate, storeFlat)
+		
 		if dl:
 			print "DOWNLOAD du document \""+entry.title.text.encode('UTF-8') +"\" de type \""+entry.GetDocumentType()+"["+ext+ "]\" vers le fichier "+file
 			client.auth_token = stdToken
 			client.Download(entry, os.path.abspath(file))
-
 		else:
 			print "EXPORT   du document \""+entry.title.text.encode('UTF-8') +"\" de type \""+entry.GetDocumentType()+"["+ext+ "]\" vers le fichier "+file
 			client.auth_token = spreadsheetToken
@@ -63,6 +54,24 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 
 def computeFileNameFor(entry, ext):
 	return entry.title.text.encode('UTF-8').replace('\\', '_').replace('/', '_').replace('$', '_')+ext
+
+def computeFileForEntry(storeFolder, entry, filenameToCreate, storeFlat):
+	if storeFlat == True:
+		return computeFlatFileForEntry(storeFolder, entry, filenameToCreate)
+	else:
+		return computeArborescentFileForEntry(storeFolder, entry, filenameToCreate)
+
+def computeFlatFileForEntry(storeFolder, entry, filenameToCreate):
+	return os.path.join(os.path.abspath(storeFolder), filenameToCreate)
+
+def computeArborescentFileForEntry(storeFolder, entry, filenameToCreate):
+	firstFolder=getFirstCollectionFolderFor(entry)
+	if firstFolder==None:
+		return os.path.join(os.path.abspath(storeFolder), filenameToCreate)
+	else:				
+		colFolder = os.path.join(os.path.abspath(storeFolder), firstFolder.title)
+		forceFolder(colFolder)
+		return os.path.join(os.path.abspath(colFolder), filenameToCreate)
 
 def getFirstCollectionFolderFor(entry):
 	firstFolder=None
