@@ -1,6 +1,8 @@
 ﻿# coding=<UTF-8>
 # il faut python 2.x : http://www.python.org/getit/
 # et Google Data API 2.0.14+ : http://code.google.com/p/gdata-python-client/downloads/list
+# https://github.com/jgraglia/Google-Docs-Backup
+# Usage : python gdocsbackup.py
  
 import gdata.spreadsheet.service
 import gdata.docs.service
@@ -11,8 +13,9 @@ from types import NoneType
 import getpass
 import os
 import datetime
+import platform
 
-def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder):
+def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFlat):
 	if not feed.entry:
 			print 'No entries in feed.\n'
 	for entry in feed.entry:
@@ -42,11 +45,26 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder):
 			dl=True			    
 		else:
 			raise Exception("ERROR !!!!!!!! Type de document non géré : "+entry.GetDocumentType())
-		file = os.path.join(os.path.abspath(storeFolder), entry.title.text.encode('UTF-8').replace('\\', '_').replace('/', '_').replace('$', '_')+ext)
+		if storeFlat == False:
+			firstFolder=None
+			for folder in entry.InFolders():
+				if firstFolder!=None:
+					# not handled... yet!
+					raise Exception("ERROR ! Document '"+entry.title.text.encode('UTF-8')+"' stocké dans (au moins) 2 collections : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstFolder.title)
+				firstFolder = folder;
+			if firstFolder==None:
+				file = os.path.join(os.path.abspath(storeFolder), entry.title.text.encode('UTF-8').replace('\\', '_').replace('/', '_').replace('$', '_')+ext)
+			else:				
+				colFolder = os.path.join(os.path.abspath(storeFolder), firstFolder.title)
+				forceFolder(colFolder)
+				file = os.path.join(os.path.abspath(colFolder), entry.title.text.encode('UTF-8').replace('\\', '_').replace('/', '_').replace('$', '_')+ext)
+		else:
+			file = os.path.join(os.path.abspath(storeFolder), entry.title.text.encode('UTF-8').replace('\\', '_').replace('/', '_').replace('$', '_')+ext)
 		if dl:
 			print "DOWNLOAD du document \""+entry.title.text.encode('UTF-8') +"\" de type \""+entry.GetDocumentType()+"["+ext+ "]\" vers le fichier "+file
 			client.auth_token = stdToken
 			client.Download(entry, os.path.abspath(file))
+
 		else:
 			print "EXPORT   du document \""+entry.title.text.encode('UTF-8') +"\" de type \""+entry.GetDocumentType()+"["+ext+ "]\" vers le fichier "+file
 			client.auth_token = spreadsheetToken
@@ -58,14 +76,19 @@ def forceFolder(dir):
 	return dir
 
 if __name__ == '__main__':
+	print "Python version "+ sys.version+" ["+platform.python_version()+"]"
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-l', '--login')
 	parser.add_argument('-p', '--password')
 	parser.add_argument('-d', '--directory')
+	parser.add_argument('-f', '--flat', action="store_true", default=False)
 	args = parser.parse_args()
 	if not args.login:
 		#python 3 : input, python 2.x : raw_input
-		args.login = raw_input("Username [%s]: " % getpass.getuser())
+		if sys.version_info >= (3, 0):
+			args.login = input("Username [%s]: " % getpass.getuser())
+		else:
+			args.login = raw_input("Username [%s]: " % getpass.getuser())
 		if not args.login:
 			args.login=getpass.getuser()
 	if not args.password:
@@ -78,9 +101,10 @@ if __name__ == '__main__':
 		args.directory=str(datetime.date.today())+"_googledocs_backup_"
 	folder = forceFolder(args.directory)
 
-	print "Nous sommes le            : ",datetime.date.today()
-	print "Authentification utilisée : " + args.login+":xxx"
-	print "Répertoire de stockage    : "+ os.path.abspath(folder)
+	print "Nous sommes le              : ",datetime.date.today()
+	print "Authentification utilisée   : " + args.login+":xxx"
+	print "Répertoire de stockage      : "+ os.path.abspath(folder)
+	print "Stockage dans la collection : "+ ("NON" if args.flat else "OUI")
 	print "===================================================================="
 	print "ATTENTION : SEUL LES DOCUMENTS APPARTENANT A "+args.login+" SERONT RECUPERES !!!"
 	print "===================================================================="
@@ -96,7 +120,7 @@ if __name__ == '__main__':
 	spreadsheets_client = gdata.spreadsheet.service.SpreadsheetsService()
 	spreadsheets_client.ClientLogin(args.login, args.password)
 	#client.auth_token = gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken())
-	downloadFeed(client, client.auth_token, gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken()), feed, folder)
+	downloadFeed(client, client.auth_token, gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken()), feed, folder, args.flat)
 	print "    -> SUCCESS"
 
 	#print document_entry.title.text
