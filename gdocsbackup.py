@@ -2,7 +2,7 @@
 # il faut python 2.x : http://www.python.org/getit/
 # et Google Data API 2.0.14+ : http://code.google.com/p/gdata-python-client/downloads/list
 # https://github.com/jgraglia/Google-Docs-Backup
-# Usage : python gdocsbackup.py
+# Usage : python gdocsbackup.py -l xxx@xxxx.com [-p password]
  
 import gdata.spreadsheet.service
 import gdata.docs.service
@@ -17,7 +17,7 @@ import platform
 
 def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFlat):
 	if not feed.entry:
-			print 'No entries in feed.\n'
+			print 'No entries in feed - Nothing to backup!\n'
 	for entry in feed.entry:
 		#print entry.title.text.encode('UTF-8'), entry.GetDocumentType(), entry.resource_id.text
 		#print "Dans les répertoires suivant : "
@@ -45,21 +45,17 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 			dl=True			    
 		else:
 			raise Exception("ERROR !!!!!!!! Type de document non géré : "+entry.GetDocumentType())
+		filenameToCreate= computeFileNameFor(entry, ext)
 		if storeFlat == False:
-			firstFolder=None
-			for folder in entry.InFolders():
-				if firstFolder!=None:
-					# not handled... yet!
-					raise Exception("ERROR ! Document '"+entry.title.text.encode('UTF-8')+"' stocké dans (au moins) 2 collections : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstFolder.title)
-				firstFolder = folder;
+			firstFolder=getFirstCollectionFolderFor(entry)
 			if firstFolder==None:
-				file = os.path.join(os.path.abspath(storeFolder), entry.title.text.encode('UTF-8').replace('\\', '_').replace('/', '_').replace('$', '_')+ext)
+				file = os.path.join(os.path.abspath(storeFolder), filenameToCreate)
 			else:				
 				colFolder = os.path.join(os.path.abspath(storeFolder), firstFolder.title)
 				forceFolder(colFolder)
-				file = os.path.join(os.path.abspath(colFolder), entry.title.text.encode('UTF-8').replace('\\', '_').replace('/', '_').replace('$', '_')+ext)
+				file = os.path.join(os.path.abspath(colFolder), filenameToCreate)
 		else:
-			file = os.path.join(os.path.abspath(storeFolder), entry.title.text.encode('UTF-8').replace('\\', '_').replace('/', '_').replace('$', '_')+ext)
+			file = os.path.join(os.path.abspath(storeFolder), filenameToCreate)
 		if dl:
 			print "DOWNLOAD du document \""+entry.title.text.encode('UTF-8') +"\" de type \""+entry.GetDocumentType()+"["+ext+ "]\" vers le fichier "+file
 			client.auth_token = stdToken
@@ -69,6 +65,18 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 			print "EXPORT   du document \""+entry.title.text.encode('UTF-8') +"\" de type \""+entry.GetDocumentType()+"["+ext+ "]\" vers le fichier "+file
 			client.auth_token = spreadsheetToken
 			client.Export(entry, os.path.abspath(file))
+
+def computeFileNameFor(entry, ext):
+	return entry.title.text.encode('UTF-8').replace('\\', '_').replace('/', '_').replace('$', '_')+ext
+
+def getFirstCollectionFolderFor(entry):
+	firstFolder=None
+	for folder in entry.InFolders():
+		if firstFolder!=None:
+			# not handled... yet!
+			raise Exception("ERROR ! Document '"+entry.title.text.encode('UTF-8')+"' stocké dans (au moins) 2 collections : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstFolder.title)
+		firstFolder = folder;
+	return firstFolder
 
 def forceFolder(dir):
 	if not os.path.exists(dir):
