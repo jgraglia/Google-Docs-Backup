@@ -120,33 +120,29 @@ def getFirstCollectionFolderFor(client, stdToken, spreadsheetToken, storeFolder,
 			if firstOwnedFolder!= None:
 				if ignoreDualCollections:
 					print "ATTENTION : "+entry.title.text.encode('UTF-8')+"' stocké dans (au moins) 2 collections vous appartenant : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstOwnedFolder.title
-					multiplesCollectionsFile = open(os.path.join(os.path.abspath(storeFolder), "multiplescollections.txt"), "a")
-					multiplesCollectionsFile.write("\""+entry.title.text.encode('UTF-8')+"\"")
-					multiplesCollectionsFile.write(" se trouvant votre collection ")
-					multiplesCollectionsFile.write("\""+firstOwnedFolder.title+"\"")
-					multiplesCollectionsFile.write(" doit aussi être stocké dans la collection ")
-					multiplesCollectionsFile.write("\""+folder.title+"\"")
-					multiplesCollectionsFile.write(" vous appartenant elle aussi")
-					multiplesCollectionsFile.write(".\n");
-					multiplesCollectionsFile.close()
+					logInReportFile(storeFolder, "\""+entry.title.text.encode('UTF-8')+"\"")
+					logInReportFile(storeFolder, " se trouvant votre collection ")
+					logInReportFile(storeFolder, "\""+firstOwnedFolder.title+"\"")
+					logInReportFile(storeFolder, " doit aussi être stocké dans la collection ")
+					logInReportFile(storeFolder, "\""+folder.title+"\"")
+					logInReportFile(storeFolder, " vous appartenant elle aussi")
+					logInReportFile(storeFolder, "\n")
 				else:	
 					raise Exception("ERROR ! Document '"+entry.title.text.encode('UTF-8')+"' stocké dans (au moins) 2 collections vous appartenant : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstFolder.title)
 			else:
 				firstOwnedFolder = folder;
 		else:
-			multiplesCollectionsFile = open(os.path.join(os.path.abspath(storeFolder), "multiplescollections.txt"), "a")
-			multiplesCollectionsFile.write("\""+entry.title.text.encode('UTF-8')+"\"")
-			multiplesCollectionsFile.write(" vous appartient, mais est stocké dans la collection partagée  ")
-			multiplesCollectionsFile.write("\""+folder.title+"\"")
-			multiplesCollectionsFile.write(". Vous devrez réimporter manuellement ce fichier dans cette collection partagée.")
-			multiplesCollectionsFile.write("\n");
-			multiplesCollectionsFile.close()		
+			logInReportFile(storeFolder, "\""+entry.title.text.encode('UTF-8')+"\"")
+			logInReportFile(storeFolder, " vous appartient, mais est stocké dans la collection partagée  ")
+			logInReportFile(storeFolder, "\""+folder.title+"\"")
+			logInReportFile(storeFolder, ". Vous devrez réimporter manuellement ce fichier dans cette collection partagée.")
+			logInReportFile(storeFolder, "\n")
 	return firstOwnedFolder
 
 def logInReportFile(storeFolder, text):
-	multiplesCollectionsFile = open(os.path.join(os.path.abspath(storeFolder), "multiplescollections.txt"), "a")
+	forceFolder(storeFolder)
+	multiplesCollectionsFile = open(os.path.join(os.path.abspath(storeFolder), "IMPORTANT-A LIRE-ST.txt, "a")
 	multiplesCollectionsFile.write(text)
-	multiplesCollectionsFile.write("\n");
 	multiplesCollectionsFile.close()
 
 def cleanStoreFolder(storeFolder):
