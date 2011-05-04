@@ -60,8 +60,11 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 			dl=True			    
 		else:
 			raise Exception("ERROR !!!!!!!! Type de document non géré : "+entry.GetDocumentType())
+		print "======\""+entry.title.text.encode('UTF-8') +"\" de type \""+entry.GetDocumentType()+"==============="
+		for folder in entry.InFolders():
+			print " -> "+folder.title
 		filenameToCreate= computeFileNameFor(entry, ext)
-		file = computeFileForEntry(client, storeFolder, entry, filenameToCreate, storeFlat, ignoreDualCollections)
+		file = computeFileForEntry(client, stdToken, spreadsheetToken, storeFolder, entry, filenameToCreate, storeFlat, ignoreDualCollections)
 		
 		if dl:
 			print "DOWNLOAD du document \""+entry.title.text.encode('UTF-8') +"\" de type \""+entry.GetDocumentType()+"["+ext+ "]\" vers le fichier "+file
@@ -75,17 +78,17 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 def computeFileNameFor(entry, ext):
 	return entry.title.text.encode('UTF-8').replace('\\', '_').replace('/', '_').replace('$', '_')+ext
 
-def computeFileForEntry(client, storeFolder, entry, filenameToCreate, storeFlat, ignoreDualCollections):
+def computeFileForEntry(client, stdToken, spreadsheetToken, storeFolder, entry, filenameToCreate, storeFlat, ignoreDualCollections):
 	if storeFlat == True:
 		return computeFlatFileForEntry(storeFolder, entry, filenameToCreate)
 	else:
-		return computeArborescentFileForEntry(client, storeFolder, ignoreDualCollections, entry, filenameToCreate)
+		return computeArborescentFileForEntry(client, stdToken, spreadsheetToken, storeFolder, ignoreDualCollections, entry, filenameToCreate)
 
 def computeFlatFileForEntry(storeFolder, entry, filenameToCreate):
 	return os.path.join(os.path.abspath(storeFolder), filenameToCreate)
 
-def computeArborescentFileForEntry(client, storeFolder, ignoreDualCollections, entry, filenameToCreate):
-	firstFolder=getFirstCollectionFolderFor(client, storeFolder, entry,ignoreDualCollections)
+def computeArborescentFileForEntry(client, stdToken, spreadsheetToken, storeFolder, ignoreDualCollections, entry, filenameToCreate):
+	firstFolder=getFirstCollectionFolderFor(client, stdToken, spreadsheetToken, storeFolder, entry,ignoreDualCollections)
 	if firstFolder==None:
 		return os.path.join(os.path.abspath(storeFolder), filenameToCreate)
 	else:				
@@ -93,10 +96,11 @@ def computeArborescentFileForEntry(client, storeFolder, ignoreDualCollections, e
 		forceFolder(colFolder)
 		return os.path.join(os.path.abspath(colFolder), filenameToCreate)
 
-def isOwnerOfFolder(folderAsLink, login):
+def isOwnerOfFolder(folderAsLink, login, stdToken, spreadsheetToken):
 	folderId = folderAsLink.href.split('/')[-1]
-	print "on essaye d'accéder à %s (%s) en tant que %s : "%(folderAsLink.title, folderId, login)
+	print "on essaye d'accéder à '%s' (%s) en tant que %s : "%(folderAsLink.title, folderId, login)
 	try:
+		client.auth_token = stdToken
 		folderAsGData = client.GetDoc(folderId)
 		aclFeed = client.GetAclPermissions(folderAsGData.resource_id.text)
 		for acl in aclFeed.entry:
@@ -104,24 +108,25 @@ def isOwnerOfFolder(folderAsLink, login):
 			if acl.role.value == "owner" and acl.scope.value== login:
 				return True
 		return False
-	except gdata.client.Unauthorized:
+	except gdata.client.Unauthorized  as error:
 		print "No access to folder %s : it seems that %s is  not the owner of that folder"% (folderAsLink.title, login)
+		print "Error: {0}".format(error)
 		return False	
 
-def getFirstCollectionFolderFor(client, storeFolder, entry, ignoreDualCollections):
+def getFirstCollectionFolderFor(client, stdToken, spreadsheetToken, storeFolder, entry, ignoreDualCollections):
 	firstOwnedFolder=None
-	firstSharedFolder=None
 	for folder in entry.InFolders():
-		if isOwnerOfFolder(folder, login):
+		if isOwnerOfFolder(folder, login, stdToken, spreadsheetToken):
 			if firstOwnedFolder!= None:
 				if ignoreDualCollections:
 					print "ATTENTION : "+entry.title.text.encode('UTF-8')+"' stocké dans (au moins) 2 collections vous appartenant : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstOwnedFolder.title
 					multiplesCollectionsFile = open(os.path.join(os.path.abspath(storeFolder), "multiplescollections.txt"), "a")
 					multiplesCollectionsFile.write("\""+entry.title.text.encode('UTF-8')+"\"")
-					multiplesCollectionsFile.write(" SE TROUVANT DANS ")
+					multiplesCollectionsFile.write(" se trouvant votre collection ")
 					multiplesCollectionsFile.write("\""+firstOwnedFolder.title+"\"")
-					multiplesCollectionsFile.write(" DOIT AUSSI ETRE STOCKE DANS ")
+					multiplesCollectionsFile.write(" doit aussi être stocké dans la collection ")
 					multiplesCollectionsFile.write("\""+folder.title+"\"")
+					multiplesCollectionsFile.write(" vous appartenant elle aussi")
 					multiplesCollectionsFile.write(".\n");
 					multiplesCollectionsFile.close()
 				else:	
@@ -129,17 +134,13 @@ def getFirstCollectionFolderFor(client, storeFolder, entry, ignoreDualCollection
 			else:
 				firstOwnedFolder = folder;
 		else:
-			if firstSharedFolder== None:
-				firstSharedFolder=folder
-
-	if firstOwnedFolder==None and firstSharedFolder!=None:
-		multiplesCollectionsFile = open(os.path.join(os.path.abspath(storeFolder), "multiplescollections.txt"), "a")
-		multiplesCollectionsFile.write("\""+entry.title.text.encode('UTF-8')+"\"")
-		multiplesCollectionsFile.write(" vous appartient, mais est stocké dans la collection partagée  ")
-		multiplesCollectionsFile.write("\""+firstSharedFolder.title+"\"")
-		multiplesCollectionsFile.write(". Vous devrez réimporter manuellement ce fichier dans cette collection partagée.")
-		multiplesCollectionsFile.write("\n");
-		multiplesCollectionsFile.close()		
+			multiplesCollectionsFile = open(os.path.join(os.path.abspath(storeFolder), "multiplescollections.txt"), "a")
+			multiplesCollectionsFile.write("\""+entry.title.text.encode('UTF-8')+"\"")
+			multiplesCollectionsFile.write(" vous appartient, mais est stocké dans la collection partagée  ")
+			multiplesCollectionsFile.write("\""+folder.title+"\"")
+			multiplesCollectionsFile.write(". Vous devrez réimporter manuellement ce fichier dans cette collection partagée.")
+			multiplesCollectionsFile.write("\n");
+			multiplesCollectionsFile.close()		
 	return firstOwnedFolder
 
 def cleanStoreFolder(storeFolder):
