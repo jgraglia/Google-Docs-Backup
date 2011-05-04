@@ -143,6 +143,12 @@ def getFirstCollectionFolderFor(client, stdToken, spreadsheetToken, storeFolder,
 			multiplesCollectionsFile.close()		
 	return firstOwnedFolder
 
+def logInReportFile(storeFolder, text):
+	multiplesCollectionsFile = open(os.path.join(os.path.abspath(storeFolder), "multiplescollections.txt"), "a")
+	multiplesCollectionsFile.write(text)
+	multiplesCollectionsFile.write("\n");
+	multiplesCollectionsFile.close()
+
 def cleanStoreFolder(storeFolder):
 	print "Cleaning "+storeFolder
 	shutil.rmtree(storeFolder)
