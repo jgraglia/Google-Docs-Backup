@@ -126,7 +126,7 @@ def getFirstCollectionFolderFor(client, stdToken, spreadsheetToken, storeFolder,
 					logInReportFile(storeFolder, " vous appartenant elle aussi")
 					logInReportFile(storeFolder, "\n")
 				else:	
-					raise Exception("ERROR ! Document '"+entry.title.text.encode('UTF-8')+"' stocké dans (au moins) 2 collections vous appartenant : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstFolder.title)
+					raise Exception("ERROR ! Document '"+entry.title.text.encode('UTF-8')+"' stocké dans (au moins) 2 collections vous appartenant : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstOwnedFolder.title)
 			else:
 				firstOwnedFolder = folder;
 		else:
