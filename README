@@ -4,7 +4,7 @@ You will need :
 
    - Python 2.x is mandatory: 
 	http://www.python.org/getit/
-	Python 3 is not (yet) supported by Google Data API
+	Python 3 is not (yet) https://code.google.com/p/gdata-python-client/issues/detail?id=229supported by Google Data API
 		see : https://code.google.com/p/gdata-python-client/issues/detail?id=229
 
    - Google Data API 2.0.14+ : 
