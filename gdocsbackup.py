@@ -3,7 +3,10 @@
 # et Google Data API 2.0.14+ : http://code.google.com/p/gdata-python-client/downloads/list
 # https://github.com/jgraglia/Google-Docs-Backup
 # Usage : python gdocsbackup.py -l xxx@xxxx.com [-p password]
- 
+
+# Doc : 
+# http://gdata-python-client.googlecode.com/svn/trunk/pydocs/gdata.docs.data.html#DocsEntry
+
 import gdata.spreadsheet.service
 import gdata.docs.service
 import gdata.docs.client
@@ -14,10 +17,12 @@ import getpass
 import os
 import datetime
 import platform
+import shutil
 
 def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFlat, ignoreDualCollections):
 	if not feed.entry:
 			print 'No entries in feed - Nothing to backup!\n'
+	cleanStoreFolder(storeFolder)
 	for entry in feed.entry:
 		ext = ".pdf"
 		dl=False
@@ -56,7 +61,7 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 		else:
 			raise Exception("ERROR !!!!!!!! Type de document non géré : "+entry.GetDocumentType())
 		filenameToCreate= computeFileNameFor(entry, ext)
-		file = computeFileForEntry(storeFolder, entry, filenameToCreate, storeFlat, ignoreDualCollections)
+		file = computeFileForEntry(client, storeFolder, entry, filenameToCreate, storeFlat, ignoreDualCollections)
 		
 		if dl:
 			print "DOWNLOAD du document \""+entry.title.text.encode('UTF-8') +"\" de type \""+entry.GetDocumentType()+"["+ext+ "]\" vers le fichier "+file
@@ -70,17 +75,17 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 def computeFileNameFor(entry, ext):
 	return entry.title.text.encode('UTF-8').replace('\\', '_').replace('/', '_').replace('$', '_')+ext
 
-def computeFileForEntry(storeFolder, entry, filenameToCreate, storeFlat, ignoreDualCollections):
+def computeFileForEntry(client, storeFolder, entry, filenameToCreate, storeFlat, ignoreDualCollections):
 	if storeFlat == True:
 		return computeFlatFileForEntry(storeFolder, entry, filenameToCreate)
 	else:
-		return computeArborescentFileForEntry(storeFolder, ignoreDualCollections, entry, filenameToCreate)
+		return computeArborescentFileForEntry(client, storeFolder, ignoreDualCollections, entry, filenameToCreate)
 
 def computeFlatFileForEntry(storeFolder, entry, filenameToCreate):
 	return os.path.join(os.path.abspath(storeFolder), filenameToCreate)
 
-def computeArborescentFileForEntry(storeFolder, ignoreDualCollections, entry, filenameToCreate):
-	firstFolder=getFirstCollectionFolderFor(entry,ignoreDualCollections)
+def computeArborescentFileForEntry(client, storeFolder, ignoreDualCollections, entry, filenameToCreate):
+	firstFolder=getFirstCollectionFolderFor(client, storeFolder, entry,ignoreDualCollections)
 	if firstFolder==None:
 		return os.path.join(os.path.abspath(storeFolder), filenameToCreate)
 	else:				
@@ -88,17 +93,58 @@ def computeArborescentFileForEntry(storeFolder, ignoreDualCollections, entry, fi
 		forceFolder(colFolder)
 		return os.path.join(os.path.abspath(colFolder), filenameToCreate)
 
-def getFirstCollectionFolderFor(entry, ignoreDualCollections):
-	firstFolder=None
+def isOwnerOfFolder(folderAsLink, login):
+	folderId = folderAsLink.href.split('/')[-1]
+	print "on essaye d'accéder à %s (%s) en tant que %s : "%(folderAsLink.title, folderId, login)
+	try:
+		folderAsGData = client.GetDoc(folderId)
+		aclFeed = client.GetAclPermissions(folderAsGData.resource_id.text)
+		for acl in aclFeed.entry:
+			print '%s (%s) is %s of %s' % (acl.scope.value, acl.scope.type, acl.role.value, folderAsGData.title.text)
+			if acl.role.value == "owner" and acl.scope.value== login:
+				return True
+		return False
+	except gdata.client.Unauthorized:
+		print "No access to folder %s : it seems that %s is  not the owner of that folder"% (folderAsLink.title, login)
+		return False	
+
+def getFirstCollectionFolderFor(client, storeFolder, entry, ignoreDualCollections):
+	firstOwnedFolder=None
+	firstSharedFolder=None
 	for folder in entry.InFolders():
-		if firstFolder!=None:
-			if ignoreDualCollections:
-				print "ATTENTION : "+entry.title.text.encode('UTF-8')+"' stocké dans (au moins) 2 collections : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstFolder.title
-				return firstFolder
-			else:	
-				raise Exception("ERROR ! Document '"+entry.title.text.encode('UTF-8')+"' stocké dans (au moins) 2 collections : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstFolder.title)
-		firstFolder = folder;
-	return firstFolder
+		if isOwnerOfFolder(folder, login):
+			if firstOwnedFolder!= None:
+				if ignoreDualCollections:
+					print "ATTENTION : "+entry.title.text.encode('UTF-8')+"' stocké dans (au moins) 2 collections vous appartenant : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstOwnedFolder.title
+					multiplesCollectionsFile = open(os.path.join(os.path.abspath(storeFolder), "multiplescollections.txt"), "a")
+					multiplesCollectionsFile.write("\""+entry.title.text.encode('UTF-8')+"\"")
+					multiplesCollectionsFile.write(" SE TROUVANT DANS ")
+					multiplesCollectionsFile.write("\""+firstOwnedFolder.title+"\"")
+					multiplesCollectionsFile.write(" DOIT AUSSI ETRE STOCKE DANS ")
+					multiplesCollectionsFile.write("\""+folder.title+"\"")
+					multiplesCollectionsFile.write(".\n");
+					multiplesCollectionsFile.close()
+				else:	
+					raise Exception("ERROR ! Document '"+entry.title.text.encode('UTF-8')+"' stocké dans (au moins) 2 collections vous appartenant : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstFolder.title)
+			else:
+				firstOwnedFolder = folder;
+		else:
+			if firstSharedFolder== None:
+				firstSharedFolder=folder
+
+	if firstOwnedFolder==None and firstSharedFolder!=None:
+		multiplesCollectionsFile = open(os.path.join(os.path.abspath(storeFolder), "multiplescollections.txt"), "a")
+		multiplesCollectionsFile.write("\""+entry.title.text.encode('UTF-8')+"\"")
+		multiplesCollectionsFile.write(" vous appartient, mais est stocké dans la collection partagée  ")
+		multiplesCollectionsFile.write("\""+firstSharedFolder.title+"\"")
+		multiplesCollectionsFile.write(". Vous devrez réimporter manuellement ce fichier dans cette collection partagée.")
+		multiplesCollectionsFile.write("\n");
+		multiplesCollectionsFile.close()		
+	return firstOwnedFolder
+
+def cleanStoreFolder(storeFolder):
+	print "Cleaning "+storeFolder
+	shutil.rmtree(storeFolder)
 
 def forceFolder(dir):
 	if not os.path.exists(dir):
@@ -153,5 +199,6 @@ if __name__ == '__main__':
 	spreadsheets_client = gdata.spreadsheet.service.SpreadsheetsService()
 	spreadsheets_client.ClientLogin(args.login, args.password)
 	#client.auth_token = gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken())
+	login = args.login
 	downloadFeed(client, client.auth_token, gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken()), feed, folder, args.flat, args.ignore)
 	print "    -> SUCCESS"
