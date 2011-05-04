@@ -1,10 +1,8 @@
 ﻿# coding=<UTF-8>
-# il faut python 2.x : http://www.python.org/getit/
-# et Google Data API 2.0.14+ : http://code.google.com/p/gdata-python-client/downloads/list
 # https://github.com/jgraglia/Google-Docs-Backup
 # Usage : python gdocsbackup.py -l xxx@xxxx.com [-p password]
 
-# Doc : 
+# Google Docs API : 
 # http://gdata-python-client.googlecode.com/svn/trunk/pydocs/gdata.docs.data.html#DocsEntry
 
 import gdata.spreadsheet.service
@@ -21,7 +19,7 @@ import shutil
 
 def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFlat, ignoreDualCollections):
 	if not feed.entry:
-			print 'No entries in feed - Nothing to backup!\n'
+		print ("No entries in feed - Nothing to backup")
 	cleanStoreFolder(storeFolder)
 	for entry in feed.entry:
 		ext = ".pdf"
@@ -60,18 +58,18 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 			dl=True			    
 		else:
 			raise Exception("ERROR !!!!!!!! Type de document non géré : "+entry.GetDocumentType())
-		print "======\""+entry.title.text.encode('UTF-8') +"\" de type \""+entry.GetDocumentType()+"==============="
+		print ("======\""+entry.title.text.encode('UTF-8') +"\" de type \""+entry.GetDocumentType()+"===============")
 		for folder in entry.InFolders():
-			print " -> "+folder.title
+			print (" -> "+folder.title)
 		filenameToCreate= computeFileNameFor(entry, ext)
 		file = computeFileForEntry(client, stdToken, spreadsheetToken, storeFolder, entry, filenameToCreate, storeFlat, ignoreDualCollections)
 		
 		if dl:
-			print "DOWNLOAD du document \""+entry.title.text.encode('UTF-8') +"\" de type \""+entry.GetDocumentType()+"["+ext+ "]\" vers le fichier "+file
+			print ("DOWNLOAD du document \""+entry.title.text.encode('UTF-8') +"\" de type \""+entry.GetDocumentType()+"["+ext+ "]\" vers le fichier "+file)
 			client.auth_token = stdToken
 			client.Download(entry, os.path.abspath(file))
 		else:
-			print "EXPORT   du document \""+entry.title.text.encode('UTF-8') +"\" de type \""+entry.GetDocumentType()+"["+ext+ "]\" vers le fichier "+file
+			print ("EXPORT   du document \""+entry.title.text.encode('UTF-8') +"\" de type \""+entry.GetDocumentType()+"["+ext+ "]\" vers le fichier "+file)
 			client.auth_token = spreadsheetToken
 			client.Export(entry, os.path.abspath(file))
 
@@ -98,19 +96,19 @@ def computeArborescentFileForEntry(client, stdToken, spreadsheetToken, storeFold
 
 def isOwnerOfFolder(folderAsLink, login, stdToken, spreadsheetToken):
 	folderId = folderAsLink.href.split('/')[-1]
-	print "on essaye d'accéder à '%s' (%s) en tant que %s : "%(folderAsLink.title, folderId, login)
+	print ("on essaye d'accéder à '"+folderAsLink.title+"' ("+folderId+") en tant que "+login)
 	try:
 		client.auth_token = stdToken
 		folderAsGData = client.GetDoc(folderId)
 		aclFeed = client.GetAclPermissions(folderAsGData.resource_id.text)
 		for acl in aclFeed.entry:
-			print '%s (%s) is %s of %s' % (acl.scope.value, acl.scope.type, acl.role.value, folderAsGData.title.text)
+			print (acl.scope.value+' ('+acl.scope.type+') is '+acl.role.value+' of '+folderAsGData.title.text)
 			if acl.role.value == "owner" and acl.scope.value== login:
 				return True
 		return False
 	except gdata.client.Unauthorized  as error:
-		print "No access to folder %s : it seems that %s is  not the owner of that folder"% (folderAsLink.title, login)
-		print "Error: {0}".format(error)
+		print ("No access to folder "+folderAsLink.title+" : it seems that "+login+" is  not the owner of that folder")
+		print ("Error: {0}".format(error))
 		return False	
 
 def getFirstCollectionFolderFor(client, stdToken, spreadsheetToken, storeFolder, entry, ignoreDualCollections):
@@ -119,7 +117,7 @@ def getFirstCollectionFolderFor(client, stdToken, spreadsheetToken, storeFolder,
 		if isOwnerOfFolder(folder, login, stdToken, spreadsheetToken):
 			if firstOwnedFolder!= None:
 				if ignoreDualCollections:
-					print "ATTENTION : "+entry.title.text.encode('UTF-8')+"' stocké dans (au moins) 2 collections vous appartenant : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstOwnedFolder.title
+					print ("ATTENTION : "+entry.title.text.encode('UTF-8')+"' stocké dans (au moins) 2 collections vous appartenant : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstOwnedFolder.title)
 					logInReportFile(storeFolder, "\""+entry.title.text.encode('UTF-8')+"\"")
 					logInReportFile(storeFolder, " se trouvant votre collection ")
 					logInReportFile(storeFolder, "\""+firstOwnedFolder.title+"\"")
@@ -141,12 +139,12 @@ def getFirstCollectionFolderFor(client, stdToken, spreadsheetToken, storeFolder,
 
 def logInReportFile(storeFolder, text):
 	forceFolder(storeFolder)
-	multiplesCollectionsFile = open(os.path.join(os.path.abspath(storeFolder), "IMPORTANT-A LIRE-ST.txt, "a")
+	multiplesCollectionsFile = open(os.path.join(os.path.abspath(storeFolder), "IMPORTANT-A LIRE-ST.txt"), 'a')
 	multiplesCollectionsFile.write(text)
 	multiplesCollectionsFile.close()
 
 def cleanStoreFolder(storeFolder):
-	print "Cleaning "+storeFolder
+	print ("Cleaning "+storeFolder)
 	shutil.rmtree(storeFolder)
 
 def forceFolder(dir):
@@ -155,7 +153,7 @@ def forceFolder(dir):
 	return dir
 
 if __name__ == '__main__':
-	print "Python version "+ sys.version+" ["+platform.python_version()+"]"
+	print ("Python version "+ sys.version+" ["+platform.python_version()+"]")
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-l', '--login')
 	parser.add_argument('-p', '--password')
@@ -174,34 +172,34 @@ if __name__ == '__main__':
 	if not args.password:
 		args.password=getpass.getpass()
 		if not args.password:
-			print "Le mot de passe est obligatoire"
+			print ("Le mot de passe est obligatoire")
 			sys.exit(1)
 			
 	if not args.directory:
 		args.directory=str(datetime.date.today())+"_googledocs_backup_"+args.login
 	folder = forceFolder(args.directory)
 
-	print "Nous sommes le               : ",datetime.date.today()
-	print "Authentification utilisée    : " + args.login+":xxx"
-	print "Répertoire de stockage       : "+ os.path.abspath(folder)
-	print "Stockage dans la collection  : "+ ("NON" if args.flat else "OUI")
+	print ("Nous sommes le               : ",datetime.date.today())
+	print ("Authentification utilisée    : " + args.login+":xxx")
+	print ("Répertoire de stockage       : "+ os.path.abspath(folder))
+	print ("Stockage dans la collection  : "+ ("NON" if args.flat else "OUI"))
 	if args.flat==False:
-		print "Ignorer si multi collections : "+ ("IGNORER" if args.ignore else "LANCER UNE ERREUR")
-	print "===================================================================="
-	print "ATTENTION : SEUL LES DOCUMENTS APPARTENANT A "+args.login+" SERONT RECUPERES !!!"
-	print "===================================================================="
+		print ("Ignorer si multi collections : "+ ("IGNORER" if args.ignore else "LANCER UNE ERREUR"))
+	print ("====================================================================")
+	print ("ATTENTION : SEUL LES DOCUMENTS APPARTENANT A "+args.login+" SERONT RECUPERES !!!")
+	print ("====================================================================")
 	raw_input("ENTREE pour continuer, ou CTRL+C pour annuler...")
-	print "Connexion sur le serveur Google..."
+	print ("Connexion sur le serveur Google...")
 	client = gdata.docs.client.DocsClient(source=args.login)
 	client.ssl = True 
 	client.http_client.debug = False
 	client.ClientLogin(args.login, args.password, client.source);
-	print "    -> succès"
-	print "Récupération de la liste des documents appartenant à "+args.login
+	print ("    -> succès")
+	print ("Récupération de la liste des documents appartenant à "+args.login)
 	feed = client.GetDocList(uri='/feeds/default/private/full/-/mine')
 	spreadsheets_client = gdata.spreadsheet.service.SpreadsheetsService()
 	spreadsheets_client.ClientLogin(args.login, args.password)
 	#client.auth_token = gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken())
 	login = args.login
 	downloadFeed(client, client.auth_token, gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken()), feed, folder, args.flat, args.ignore)
-	print "    -> SUCCESS"
+	print ("    -> SUCCESS")
