@@ -15,7 +15,7 @@ import os
 import datetime
 import platform
 
-def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFlat):
+def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFlat, ignoreDualCollections):
 	if not feed.entry:
 			print 'No entries in feed - Nothing to backup!\n'
 	for entry in feed.entry:
@@ -28,20 +28,35 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 		elif entry.GetDocumentType() == "drawing":
 		    ext =".svg"
 		elif entry.GetDocumentType() == "spreadsheet":
-		    ext =".xls"	
+		    ext =".xls"
+		elif entry.GetDocumentType() == "pdf":
+			ext =""	
+			dl=True				    
+		elif entry.GetDocumentType() == "application/vnd.ms-excel":
+			ext =""	
+			dl=True				    
+		elif entry.GetDocumentType() == "application/msword":
+			ext =""	
+			dl=True				    
+		elif entry.GetDocumentType() == "application/vnd.ms-powerpoint":
+			ext =""	
+			dl=True				    
 		elif entry.GetDocumentType() == "image/jpeg":
-			ext =".jpg"
+			ext =""
 			dl=True				    
 		elif entry.GetDocumentType() == "image/png":
-			ext =".png"
+			ext =""
 			dl=True			    
 		elif entry.GetDocumentType() == "text/xml":
-			ext =".xml"
+			ext =""
+			dl=True			    
+		elif entry.GetDocumentType() == "video/mpeg":
+			ext =""
 			dl=True			    
 		else:
 			raise Exception("ERROR !!!!!!!! Type de document non géré : "+entry.GetDocumentType())
 		filenameToCreate= computeFileNameFor(entry, ext)
-		file = computeFileForEntry(storeFolder, entry, filenameToCreate, storeFlat)
+		file = computeFileForEntry(storeFolder, entry, filenameToCreate, storeFlat, ignoreDualCollections)
 		
 		if dl:
 			print "DOWNLOAD du document \""+entry.title.text.encode('UTF-8') +"\" de type \""+entry.GetDocumentType()+"["+ext+ "]\" vers le fichier "+file
@@ -55,17 +70,17 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 def computeFileNameFor(entry, ext):
 	return entry.title.text.encode('UTF-8').replace('\\', '_').replace('/', '_').replace('$', '_')+ext
 
-def computeFileForEntry(storeFolder, entry, filenameToCreate, storeFlat):
+def computeFileForEntry(storeFolder, entry, filenameToCreate, storeFlat, ignoreDualCollections):
 	if storeFlat == True:
 		return computeFlatFileForEntry(storeFolder, entry, filenameToCreate)
 	else:
-		return computeArborescentFileForEntry(storeFolder, entry, filenameToCreate)
+		return computeArborescentFileForEntry(storeFolder, ignoreDualCollections, entry, filenameToCreate)
 
 def computeFlatFileForEntry(storeFolder, entry, filenameToCreate):
 	return os.path.join(os.path.abspath(storeFolder), filenameToCreate)
 
-def computeArborescentFileForEntry(storeFolder, entry, filenameToCreate):
-	firstFolder=getFirstCollectionFolderFor(entry)
+def computeArborescentFileForEntry(storeFolder, ignoreDualCollections, entry, filenameToCreate):
+	firstFolder=getFirstCollectionFolderFor(entry,ignoreDualCollections)
 	if firstFolder==None:
 		return os.path.join(os.path.abspath(storeFolder), filenameToCreate)
 	else:				
@@ -73,12 +88,15 @@ def computeArborescentFileForEntry(storeFolder, entry, filenameToCreate):
 		forceFolder(colFolder)
 		return os.path.join(os.path.abspath(colFolder), filenameToCreate)
 
-def getFirstCollectionFolderFor(entry):
+def getFirstCollectionFolderFor(entry, ignoreDualCollections):
 	firstFolder=None
 	for folder in entry.InFolders():
 		if firstFolder!=None:
-			# not handled... yet!
-			raise Exception("ERROR ! Document '"+entry.title.text.encode('UTF-8')+"' stocké dans (au moins) 2 collections : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstFolder.title)
+			if ignoreDualCollections:
+				print "ATTENTION : "+entry.title.text.encode('UTF-8')+"' stocké dans (au moins) 2 collections : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstFolder.title
+				return firstFolder
+			else:	
+				raise Exception("ERROR ! Document '"+entry.title.text.encode('UTF-8')+"' stocké dans (au moins) 2 collections : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstFolder.title)
 		firstFolder = folder;
 	return firstFolder
 
@@ -94,6 +112,7 @@ if __name__ == '__main__':
 	parser.add_argument('-p', '--password')
 	parser.add_argument('-d', '--directory')
 	parser.add_argument('-f', '--flat', action="store_true", default=False)
+	parser.add_argument('-i', '--ignore', action="store_true", default=False)
 	args = parser.parse_args()
 	if not args.login:
 		#python 3 : input, python 2.x : raw_input
@@ -110,13 +129,15 @@ if __name__ == '__main__':
 			sys.exit(1)
 			
 	if not args.directory:
-		args.directory=str(datetime.date.today())+"_googledocs_backup_"
+		args.directory=str(datetime.date.today())+"_googledocs_backup_"+args.login
 	folder = forceFolder(args.directory)
 
-	print "Nous sommes le              : ",datetime.date.today()
-	print "Authentification utilisée   : " + args.login+":xxx"
-	print "Répertoire de stockage      : "+ os.path.abspath(folder)
-	print "Stockage dans la collection : "+ ("NON" if args.flat else "OUI")
+	print "Nous sommes le               : ",datetime.date.today()
+	print "Authentification utilisée    : " + args.login+":xxx"
+	print "Répertoire de stockage       : "+ os.path.abspath(folder)
+	print "Stockage dans la collection  : "+ ("NON" if args.flat else "OUI")
+	if args.flat==False:
+		print "Ignorer si multi collections : "+ ("IGNORER" if args.ignore else "LANCER UNE ERREUR")
 	print "===================================================================="
 	print "ATTENTION : SEUL LES DOCUMENTS APPARTENANT A "+args.login+" SERONT RECUPERES !!!"
 	print "===================================================================="
@@ -132,5 +153,5 @@ if __name__ == '__main__':
 	spreadsheets_client = gdata.spreadsheet.service.SpreadsheetsService()
 	spreadsheets_client.ClientLogin(args.login, args.password)
 	#client.auth_token = gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken())
-	downloadFeed(client, client.auth_token, gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken()), feed, folder, args.flat)
+	downloadFeed(client, client.auth_token, gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken()), feed, folder, args.flat, args.ignore)
 	print "    -> SUCCESS"
