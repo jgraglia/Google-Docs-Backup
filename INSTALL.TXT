@@ -1,0 +1,10 @@
+=========== Windows ===============
+
+install python (VERSION 2.x REQUIRED!!)
+make sure python.exe is in the PATH
+unzip gdata-2.0.14.zip
+cd into folder "gdata-2.0.14" and execute following command : 
+python setup.py install
+
+Then launch command : 
+python gdocsbackup.py [-l jdoe@gmail.com]  -i
