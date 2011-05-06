@@ -45,7 +45,7 @@ except:
 	exit(1)
 
 __update_url="https://github.com/jgraglia/Google-Docs-Backup/raw/master/gdocsbackup.py"
-__version=0.3
+__version=0.4
 	
 # copy from : GDataCopier, http://gdatacopier.googlecode.com/
 # windows problem :  "|*><?
