@@ -1,4 +1,5 @@
 ﻿# coding=<UTF-8>
+#!/usr/bin/env python
 # https://github.com/jgraglia/Google-Docs-Backup
 # Usage : python gdocsbackup.py -l xxx@xxxx.com [-p password]
 
@@ -43,9 +44,16 @@ except:
 	print ("Requires gdata-python-client v2.0+, downloadable from Google at")
 	print ("<http://code.google.com/p/gdata-python-client/>")
 	exit(1)
+try:
+        # Add logs functionality
+        import logging
+        LOG = logging.getLogger("GDOCSBACKUP")
+except:
+        print "Failed to find logging python modules, please validate the environment"
+        exit(1)
 
 __update_url="https://github.com/jgraglia/Google-Docs-Backup/raw/master/gdocsbackup.py"
-__version=0.4
+__version=0.5
 	
 # copy from : GDataCopier, http://gdatacopier.googlecode.com/
 # windows problem :  "|*><?
@@ -69,13 +77,35 @@ def sanatize_filename(origFileName):
 
 # copy from : GDataCopier, http://gdatacopier.googlecode.com/
 def signal_handler(signal, frame):
-	    print "\n[Interrupted] Bye Bye!"
-	    sys.exit(2)
+	LOG.debug("\n[Interrupted] Bye Bye!")
+	sys.exit(2)
+
+
+def setup_logger(options):
+    msg_format = '%(asctime)s : %(levelname)-8s %(message)s'
+    if options.verbose:
+        level = logging.DEBUG
+    else:
+        level = logging.INFO
+    #File
+    logging.basicConfig(level=level, format=msg_format, filename="output.log", filemode="w")
+    #Console
+    console = logging.StreamHandler()
+    console.setLevel(level)
+    formatter = logging.Formatter('%(asctime)s : %(levelname)-8s %(message)s')
+    console.setFormatter(formatter)
+    logging.getLogger('').addHandler(console)
+    
+    LOG.setLevel(level)
+    #LOG.info("test : INFO message")
+    #LOG.debug("test : DEBUG message")
+    #LOG.warning("test : WARNING message")
+    #LOG.error("test : ERROR message")
 
 
 def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFlat, ignoreDualCollections):
 	if not feed.entry:
-		print ("No entries in feed - Nothing to backup")
+		LOG.info ("No entries in feed - Nothing to backup")
 	cleanStoreFolder(storeFolder)
 	forceFolder(storeFolder)
 	stats = {'doc':0, 'spreadsheet':0, 'impress':0, 'images':0, 'pdf':0, 'other':0}
@@ -128,24 +158,24 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 			stats['other']+=1			    
 		else:
 			raise Exception("ERROR !!!!!!!! Type de document non géré : "+entry.GetDocumentType())
-		print ("---\"%s\" de type %s"%(entry.title.text.encode(sys.getfilesystemencoding()), entry.GetDocumentType()))
+		LOG.info ("---\"%s\" de type %s"%(entry.title.text.encode(sys.getfilesystemencoding()), entry.GetDocumentType()))
 		for folder in entry.InFolders():
-			print ("   |- "+folder.title)
+			LOG.info ("   |- "+folder.title)
 		filenameToCreate= computeFileNameFor(entry, ext)
 		file = computeFileForEntry(client, stdToken, spreadsheetToken, storeFolder, entry, filenameToCreate, storeFlat, ignoreDualCollections)
 		
 		if dl:
-			print ("   |-----> DOWNLOADED")
-			print ("           \""+entry.title.text.encode(sys.getfilesystemencoding()) +"\" ["+entry.GetDocumentType()+"] : "+file)
+			LOG.info ("   |-----> DOWNLOADED")
+			LOG.info ("           \""+entry.title.text.encode(sys.getfilesystemencoding()) +"\" ["+entry.GetDocumentType()+"] : "+file)
 			client.auth_token = stdToken
 			client.Download(entry, os.path.abspath(file))
 		else:
-			print ("   |-----> EXPORTED")
-			print ("           \""+entry.title.text.encode(sys.getfilesystemencoding()) +"\" ["+entry.GetDocumentType()+"] : "+file)
+			LOG.info ("   |-----> EXPORTED")
+			LOG.info ("           \""+entry.title.text.encode(sys.getfilesystemencoding()) +"\" ["+entry.GetDocumentType()+"] : "+file)
 			client.auth_token = spreadsheetToken
 			client.Export(entry, os.path.abspath(file))
-	print ("Stats : "+str(stats))
-	print warnUserOfReportFileIfNecessary(storeFolder)
+	LOG.info ("Stats : "+str(stats))
+	warnUserOfReportFileIfNecessary(storeFolder)
 
 def computeFileNameFor(entry, ext):
 	return sanatize_filename(entry.title.text)+ext
@@ -171,7 +201,7 @@ def computeArborescentFileForEntry(client, stdToken, spreadsheetToken, storeFold
 def isOwnerOfFolder(folderAsLink, login, stdToken, spreadsheetToken):
 	folderId = folderAsLink.href.split('/')[-1]
 	if args.verbose:
-		print ("on essaye d'accéder à '"+folderAsLink.title+"' ("+folderId+") en tant que "+login)
+		LOG.debug ("on essaye d'accéder à '"+folderAsLink.title+"' ("+folderId+") en tant que "+login)
 	try:
 		client.auth_token = stdToken
 		folderAsGData = client.GetDoc(folderId)
@@ -183,8 +213,8 @@ def isOwnerOfFolder(folderAsLink, login, stdToken, spreadsheetToken):
 				return True
 		return False
 	except gdata.client.Unauthorized  as error:
-		print ("No access to folder "+folderAsLink.title.text.encode(sys.getfilesystemencoding())+" : it seems that "+login+" is  not the owner of that folder")
-		print ("Error: {0}".format(error))
+		LOG.error ("No access to folder "+folderAsLink.title.text.encode(sys.getfilesystemencoding())+" : it seems that "+login+" is  not the owner of that folder")
+		LOG.error ("Error: {0}".format(error))
 		return False	
 
 def getFirstCollectionFolderFor(client, stdToken, spreadsheetToken, storeFolder, entry, ignoreDualCollections):
@@ -193,22 +223,22 @@ def getFirstCollectionFolderFor(client, stdToken, spreadsheetToken, storeFolder,
 		if isOwnerOfFolder(folder, login, stdToken, spreadsheetToken):
 			if firstOwnedFolder!= None:
 				if ignoreDualCollections:
-					print ("           ATTENTION : "+entry.title.text.encode(sys.getfilesystemencoding())+"' stocké dans (au moins) 2 collections vous appartenant : ceci n'est pas géré! "+" : "+folder.title.text.encode(sys.getfilesystemencoding()) + " & "+ firstOwnedFolder.title.text.encode(sys.getfilesystemencoding()))
+					LOG.warning ("           ATTENTION : "+entry.title.text.encode(sys.getfilesystemencoding())+"' stocké dans (au moins) 2 collections vous appartenant : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstOwnedFolder.title)
 					logInReportFile(storeFolder, "\""+entry.title.text.encode(sys.getfilesystemencoding())+"\"")
 					logInReportFile(storeFolder, " se trouvant votre collection ")
-					logInReportFile(storeFolder, "\""+firstOwnedFolder.title.text.encode(sys.getfilesystemencoding())+"\"")
+					logInReportFile(storeFolder, "\""+firstOwnedFolder.title+"\"")
 					logInReportFile(storeFolder, " doit aussi être stocké dans la collection ")
-					logInReportFile(storeFolder, "\""+folder.title.text.encode(sys.getfilesystemencoding())+"\"")
+					logInReportFile(storeFolder, "\""+folder.title+"\"")
 					logInReportFile(storeFolder, " vous appartenant elle aussi")
 					logInReportFile(storeFolder, "\n")
 				else:	
-					raise Exception("ERROR ! Document '"+entry.title.text.encode(sys.getfilesystemencoding())+"' stocké dans (au moins) 2 collections vous appartenant : ceci n'est pas géré! "+" : "+folder.title.text.encode(sys.getfilesystemencoding()) + " & "+ firstOwnedFolder.title.text.encode(sys.getfilesystemencoding()))
+					raise Exception("ERROR ! Document '"+entry.title.text.encode(sys.getfilesystemencoding())+"' stocké dans (au moins) 2 collections vous appartenant : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstOwnedFolder.title)
 			else:
 				firstOwnedFolder = folder;
 		else:
 			logInReportFile(storeFolder, "\""+entry.title.text.encode(sys.getfilesystemencoding())+"\"")
 			logInReportFile(storeFolder, " vous appartient, mais est stocké dans la collection partagée  ")
-			logInReportFile(storeFolder, "\""+folder.title.text.encode(sys.getfilesystemencoding())+"\"")
+			logInReportFile(storeFolder, "\""+folder.title+"\"")
 			logInReportFile(storeFolder, ". Vous devrez réimporter manuellement ce fichier dans cette collection partagée.")
 			logInReportFile(storeFolder, "\n")
 	return firstOwnedFolder
@@ -225,11 +255,11 @@ def logInReportFile(storeFolder, text):
 def warnUserOfReportFileIfNecessary(storeFolder):
 	reportFile = makeReportFile(storeFolder)
 	if os.path.isfile(reportFile):
-		print ("===== IMPORTANT ===== : some important NOTES are stored in "+reportFile)
-		print ("Please read them carrefully")
+		LOG.warning ("===== IMPORTANT ===== : some important NOTES are stored in "+reportFile)
+		LOG.warning ("Please read them carrefully")
 
 def cleanStoreFolder(storeFolder):
-	print ("Cleaning %s" % storeFolder)
+	LOG.debug ("Cleaning %s" % storeFolder)
 	shutil.rmtree(storeFolder)
 
 def forceFolder(dir):
@@ -258,8 +288,11 @@ if __name__ == '__main__':
 		parser.print_help()
 		sys.exit(0)
 
+	setup_logger(args)
+
 	if args.update:
 		print ("Automatic update from %s to %s"% (__update_url, __file__))
+		raw_input("Press ENTER to overwrite current version, or CTRL+C to exit now!")
 		urllib.urlretrieve(__update_url, __file__)
 		print ("New version installed in %s"%__file__)
 		sys.exit(0)
@@ -282,30 +315,30 @@ if __name__ == '__main__':
 		args.directory=str(datetime.date.today())+"_googledocs_backup_"+args.login
 	folder = forceFolder(args.directory)
 
-	print ("Nous sommes le               : %s" % datetime.date.today())
-	print ("Authentification utilisée    : %s:xx" % args.login)
-	print ("Répertoire de stockage       : "+ os.path.abspath(folder))
-	print ("Stockage dans la collection  : "+ ("NON" if args.flat else "OUI"))
+	LOG.info ("Nous sommes le               : %s" % datetime.date.today())
+	LOG.info ("Authentification utilisée    : %s:xx" % args.login)
+	LOG.info ("Répertoire de stockage       : "+ os.path.abspath(folder))
+	LOG.info ("Stockage dans la collection  : "+ ("NON" if args.flat else "OUI"))
 	if args.flat==False:
-		print ("Ignorer si multi collections : "+ ("IGNORER" if args.ignore else "LANCER UNE ERREUR"))
+		LOG.info ("Ignorer si multi collections : "+ ("IGNORER" if args.ignore else "LANCER UNE ERREUR"))
 	if args.verbose==True:
-		print ("Mode debug                   : ACTIVE")
-	print ("System Encoding              : %s"%sys.getfilesystemencoding())
-	print ("====================================================================")
-	print ("ATTENTION : SEUL LES DOCUMENTS APPARTENANT A "+args.login+" SERONT RECUPERES !!!")
-	print ("====================================================================")
+		LOG.info ("Mode debug                   : ACTIVE")
+	LOG.info ("System Encoding              : %s"%sys.getfilesystemencoding())
+	LOG.info ("====================================================================")
+	LOG.info ("ATTENTION : SEUL LES DOCUMENTS APPARTENANT A "+args.login+" SERONT RECUPERES !!!")
+	LOG.info ("====================================================================")
 	raw_input("ENTREE pour continuer, ou CTRL+C pour annuler...")
-	print ("Connexion sur le serveur Google...")
+	LOG.info ("Connexion sur le serveur Google...")
 	client = gdata.docs.client.DocsClient(source=args.login)
 	client.ssl = True 
 	client.http_client.debug = False
 	client.ClientLogin(args.login, args.password, client.source);
-	print ("    -> succès")
-	print ("Récupération de la liste des documents appartenant à %s"%args.login)
+	LOG.info ("    -> succès")
+	LOG.info ("Récupération de la liste des documents appartenant à %s"%args.login)
 	feed = client.GetDocList(uri='/feeds/default/private/full/-/mine')
 	spreadsheets_client = gdata.spreadsheet.service.SpreadsheetsService()
 	spreadsheets_client.ClientLogin(args.login, args.password)
 	#client.auth_token = gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken())
 	login = args.login
 	downloadFeed(client, client.auth_token, gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken()), feed, folder, args.flat, args.ignore)
-	print ("SUCCESS!")
+	LOG.info ("SUCCESS!")
