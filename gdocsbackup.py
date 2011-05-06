@@ -44,7 +44,8 @@ except:
 	exit(1)
 	
 # copy from : GDataCopier, http://gdatacopier.googlecode.com/
-__bad_chars__ = ['\\', '/', '&', ':']
+# windows problem :  "|*><?
+__bad_chars__ = ['\\', '/', '&', ':', '|', '*', '>', '<', '?', '"']
 
 # Strips characters that are not acceptable as file names
 # copy from : GDataCopier, http://gdatacopier.googlecode.com/
@@ -226,15 +227,21 @@ if __name__ == '__main__':
 	signal.signal(signal.SIGINT, signal_handler)
 	print ("Python version %s [%s]"% (sys.version, platform.python_version()))
 	print ("Inspired (but with different approach) by GDataCopier, http://gdatacopier.googlecode.com/")
-	parser = argparse.ArgumentParser()
+	parser = argparse.ArgumentParser(description='Standard exemple : gdocsbackup.py -l jdoe@gmail.com ',epilog="Have fun!")
 	parser.add_argument('-l', '--login')
-	parser.add_argument('-p', '--password')
-	parser.add_argument('-d', '--directory')
-	parser.add_argument('-f', '--flat', action="store_true", default=False)
+	parser.add_argument('-p', '--password', help="Warning : the password could be stored in your console history (OS dependant). You'd better not use the option and enter your password when asked by the program")
+	parser.add_argument('-d', '--directory', help="Where to store you document. If not provided, will use a default localtion based on login and date")
+	parser.add_argument('-f', '--flat', action="store_true", default=False, help="when activated, don't store docs in collections")
 	parser.add_argument('-i', '--ignore', action="store_true", default=False)
 	parser.add_argument('-v', '--verbose', action = 'store_true', dest = 'verbose', default = False,	help = 'increase verbosity')	
+	parser.add_argument('-u', '--usage', action="store_true", default=False, help="show help and exit")
 	
 	args = parser.parse_args()
+
+	if args.usage:
+		parser.print_help()
+		sys.exit(0)
+
 	if not args.login:
 		#python 3 : input, python 2.x : raw_input
 		if sys.version_info >= (3, 0):
@@ -246,7 +253,7 @@ if __name__ == '__main__':
 	if not args.password:
 		args.password=getpass.getpass()
 		if not args.password:
-			print ("Le mot de passe est obligatoire")
+			print ("Password is mandatory")
 			sys.exit(1)
 			
 	if not args.directory:
