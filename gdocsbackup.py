@@ -72,6 +72,7 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 	if not feed.entry:
 		print ("No entries in feed - Nothing to backup")
 	cleanStoreFolder(storeFolder)
+	forceFolder(storeFolder)
 	stats = {'doc':0, 'spreadsheet':0, 'impress':0, 'images':0, 'pdf':0, 'other':0}
 	for entry in feed.entry:
 		ext = ".pdf"
