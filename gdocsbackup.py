@@ -31,6 +31,7 @@ try:
 	import platform
 	import shutil
 	import signal
+	import urllib
 except:
 	print ("failed to find some basic python modules, please validate the environment")
 	exit(1)
@@ -42,6 +43,9 @@ except:
 	print ("Requires gdata-python-client v2.0+, downloadable from Google at")
 	print ("<http://code.google.com/p/gdata-python-client/>")
 	exit(1)
+
+__update_url="https://github.com/jgraglia/Google-Docs-Backup/raw/master/gdocsbackup.py"
+__version=0.2
 	
 # copy from : GDataCopier, http://gdatacopier.googlecode.com/
 # windows problem :  "|*><?
@@ -225,6 +229,7 @@ def forceFolder(dir):
 
 if __name__ == '__main__':
 	signal.signal(signal.SIGINT, signal_handler)
+	print ("Google Docs Backup v. %s"%__version)
 	print ("Python version %s [%s]"% (sys.version, platform.python_version()))
 	print ("Inspired (but with different approach) by GDataCopier, http://gdatacopier.googlecode.com/")
 	parser = argparse.ArgumentParser(description='Standard exemple : gdocsbackup.py -l jdoe@gmail.com ',epilog="Have fun!")
@@ -235,11 +240,18 @@ if __name__ == '__main__':
 	parser.add_argument('-i', '--ignore', action="store_true", default=False)
 	parser.add_argument('-v', '--verbose', action = 'store_true', dest = 'verbose', default = False,	help = 'increase verbosity')	
 	parser.add_argument('-u', '--usage', action="store_true", default=False, help="show help and exit")
+	parser.add_argument('-U', '--update', action="store_true", default=False, help="Self update from "+__update_url+" and exit")
 	
 	args = parser.parse_args()
 
 	if args.usage:
 		parser.print_help()
+		sys.exit(0)
+
+	if args.update:
+		print ("Automatic update from %s to %s"% (__update_url, __file__))
+		urllib.urlretrieve(__update_url, __file__)
+		print ("New version installed in %s"%__file__)
 		sys.exit(0)
 
 	if not args.login:
