@@ -1,10 +1,28 @@
 =========== Windows ===============
 
 install python (VERSION 2.x REQUIRED!!)
+	http://www.python.org/ftp/python/2.7.1/python-2.7.1.msi
 make sure python.exe is in the PATH
+download Google Data APIs Python Client Library 2.0.14+
+	http://code.google.com/p/gdata-python-client/downloads/detail?name=gdata-2.0.14.zip&can=2&q=
 unzip gdata-2.0.14.zip
 cd into folder "gdata-2.0.14" and execute following command : 
 python setup.py install
 
 Then launch command : 
 python gdocsbackup.py [-l jdoe@gmail.com]  -i
+
+
+=========== Linux ===============
+
+install python (VERSION 2.x REQUIRED!!)
+make sure python is in the PATH
+download Google Data APIs Python Client Library 2.0.14+
+	http://code.google.com/p/gdata-python-client/downloads/detail?name=gdata-2.0.14.tar.gz&can=2&q=
+tar xf gdata-2.0.14.tar.gz
+cd into folder "gdata-2.0.14" and execute following command : 
+python setup.py install
+
+Then launch command : 
+python gdocsbackup.py [-l jdoe@gmail.com]  -i
+
