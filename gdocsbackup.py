@@ -45,7 +45,7 @@ except:
 	exit(1)
 
 __update_url="https://github.com/jgraglia/Google-Docs-Backup/raw/master/gdocsbackup.py"
-__version=0.2
+__version=0.3
 	
 # copy from : GDataCopier, http://gdatacopier.googlecode.com/
 # windows problem :  "|*><?
@@ -145,6 +145,7 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 			client.auth_token = spreadsheetToken
 			client.Export(entry, os.path.abspath(file))
 	print ("Stats : "+str(stats))
+	print warnUserOfReportFileIfNecessary(storeFolder)
 
 def computeFileNameFor(entry, ext):
 	return sanatize_filename(entry.title.text)+ext
@@ -212,11 +213,20 @@ def getFirstCollectionFolderFor(client, stdToken, spreadsheetToken, storeFolder,
 			logInReportFile(storeFolder, "\n")
 	return firstOwnedFolder
 
+def makeReportFile(storeFolder):
+	return os.path.join(os.path.abspath(storeFolder), "IMPORTANT-A LIRE-ST.txt")
+
 def logInReportFile(storeFolder, text):
 	forceFolder(storeFolder)
-	multiplesCollectionsFile = open(os.path.join(os.path.abspath(storeFolder), "IMPORTANT-A LIRE-ST.txt"), 'a')
+	multiplesCollectionsFile = open(makeReportFile(storeFolder), 'a')
 	multiplesCollectionsFile.write(text)
 	multiplesCollectionsFile.close()
+
+def warnUserOfReportFileIfNecessary(storeFolder):
+	reportFile = makeReportFile(storeFolder)
+	if os.path.isfile(reportFile):
+		print ("===== IMPORTANT ===== : some important NOTES are stored in "+reportFile)
+		print ("Please read them carrefully")
 
 def cleanStoreFolder(storeFolder):
 	print ("Cleaning %s" % storeFolder)
