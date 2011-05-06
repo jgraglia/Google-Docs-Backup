@@ -138,7 +138,7 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 			print ("           \""+entry.title.text.encode(sys.getfilesystemencoding()) +"\" ["+entry.GetDocumentType()+"] : "+file)
 			client.auth_token = spreadsheetToken
 			client.Export(entry, os.path.abspath(file))
-	print ("Stats : "+stats)
+	print ("Stats : "+str(stats))
 
 def computeFileNameFor(entry, ext):
 	return sanatize_filename(entry.title.text)+ext
