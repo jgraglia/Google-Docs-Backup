@@ -183,7 +183,7 @@ def isOwnerOfFolder(folderAsLink, login, stdToken, spreadsheetToken):
 				return True
 		return False
 	except gdata.client.Unauthorized  as error:
-		print ("No access to folder "+folderAsLink.title+" : it seems that "+login+" is  not the owner of that folder")
+		print ("No access to folder "+folderAsLink.title.text.encode(sys.getfilesystemencoding())+" : it seems that "+login+" is  not the owner of that folder")
 		print ("Error: {0}".format(error))
 		return False	
 
@@ -193,22 +193,22 @@ def getFirstCollectionFolderFor(client, stdToken, spreadsheetToken, storeFolder,
 		if isOwnerOfFolder(folder, login, stdToken, spreadsheetToken):
 			if firstOwnedFolder!= None:
 				if ignoreDualCollections:
-					print ("           ATTENTION : "+entry.title.text.encode(sys.getfilesystemencoding())+"' stocké dans (au moins) 2 collections vous appartenant : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstOwnedFolder.title)
-					logInReportFile(storeFolder, "\""+entry.title.text.encode('UTF-8')+"\"")
+					print ("           ATTENTION : "+entry.title.text.encode(sys.getfilesystemencoding())+"' stocké dans (au moins) 2 collections vous appartenant : ceci n'est pas géré! "+" : "+folder.title.text.encode(sys.getfilesystemencoding()) + " & "+ firstOwnedFolder.title.text.encode(sys.getfilesystemencoding()))
+					logInReportFile(storeFolder, "\""+entry.title.text.encode(sys.getfilesystemencoding())+"\"")
 					logInReportFile(storeFolder, " se trouvant votre collection ")
-					logInReportFile(storeFolder, "\""+firstOwnedFolder.title+"\"")
+					logInReportFile(storeFolder, "\""+firstOwnedFolder.title.text.encode(sys.getfilesystemencoding())+"\"")
 					logInReportFile(storeFolder, " doit aussi être stocké dans la collection ")
-					logInReportFile(storeFolder, "\""+folder.title+"\"")
+					logInReportFile(storeFolder, "\""+folder.title.text.encode(sys.getfilesystemencoding())+"\"")
 					logInReportFile(storeFolder, " vous appartenant elle aussi")
 					logInReportFile(storeFolder, "\n")
 				else:	
-					raise Exception("ERROR ! Document '"+entry.title.text.encode(sys.getfilesystemencoding())+"' stocké dans (au moins) 2 collections vous appartenant : ceci n'est pas géré! "+" : "+folder.title + " & "+ firstOwnedFolder.title)
+					raise Exception("ERROR ! Document '"+entry.title.text.encode(sys.getfilesystemencoding())+"' stocké dans (au moins) 2 collections vous appartenant : ceci n'est pas géré! "+" : "+folder.title.text.encode(sys.getfilesystemencoding()) + " & "+ firstOwnedFolder.title.text.encode(sys.getfilesystemencoding()))
 			else:
 				firstOwnedFolder = folder;
 		else:
 			logInReportFile(storeFolder, "\""+entry.title.text.encode(sys.getfilesystemencoding())+"\"")
 			logInReportFile(storeFolder, " vous appartient, mais est stocké dans la collection partagée  ")
-			logInReportFile(storeFolder, "\""+folder.title+"\"")
+			logInReportFile(storeFolder, "\""+folder.title.text.encode(sys.getfilesystemencoding())+"\"")
 			logInReportFile(storeFolder, ". Vous devrez réimporter manuellement ce fichier dans cette collection partagée.")
 			logInReportFile(storeFolder, "\n")
 	return firstOwnedFolder
