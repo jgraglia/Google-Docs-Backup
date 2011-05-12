@@ -328,7 +328,7 @@ if __name__ == '__main__':
 	if not args.directory:
 		args.directory=str(datetime.date.today())+"_googledocs_backup_"+args.login
 	folder = forceFolder(args.directory)
-
+	LOG.info ("Google Docs Backup v. %s"%__version)
 	LOG.info ("Nous sommes le               : %s" % datetime.date.today())
 	LOG.info ("Authentification utilisée    : %s:xx" % args.login)
 	LOG.info ("Répertoire de stockage       : "+ os.path.abspath(folder))
