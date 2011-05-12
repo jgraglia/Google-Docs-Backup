@@ -54,7 +54,7 @@ except:
         exit(1)
 
 __update_url="https://github.com/jgraglia/Google-Docs-Backup/raw/master/gdocsbackup.py"
-__version=0.5
+__version=0.6
 	
 # copy from : GDataCopier, http://gdatacopier.googlecode.com/
 # windows problem :  "|*><?
@@ -109,7 +109,7 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 		LOG.info ("No entries in feed - Nothing to backup")
 	cleanStoreFolder(storeFolder)
 	forceFolder(storeFolder)
-	stats = {'doc':0, 'spreadsheet':0, 'impress':0, 'images':0, 'pdf':0, 'other':0}
+	stats = {'doc':0, 'spreadsheet':0, 'impress':0, 'drawings':0, 'images':0, 'pdf':0, 'other':0}
 	for entry in feed.entry:
 		ext = ".pdf"
 		dl=False
@@ -121,7 +121,9 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 			stats['impress']+=1
 		elif entry.GetDocumentType() == "drawing":
 			ext =".svg"
-			stats['images']+=1
+			stats['drawings']+=1
+			logInReportFile(storeFolder, ". "+entry.title.text.encode(sys.getfilesystemencoding())+" : Google can export drawing as SVG file, but can't reimport them! This is terrible!\n")
+			logInReportFile(storeFolder, "    The only option I'm aware is to share the docs, then make a copy in order to get ownership\n")
 		elif entry.GetDocumentType() == "spreadsheet":
 			ext =".xls"
 			stats['spreadsheet']+=1
@@ -266,7 +268,7 @@ def logInReportFile(storeFolder, text):
 def warnUserOfReportFileIfNecessary(storeFolder):
 	reportFile = makeReportFile(storeFolder)
 	if os.path.isfile(reportFile):
-		LOG.warning ("===== IMPORTANT ===== : some important NOTES are stored in "+reportFile)
+		LOG.warning ("===== IMPORTANT ===== : some additionnal instructions are stored in "+reportFile)
 		LOG.warning ("Please read them carrefully")
 
 def cleanStoreFolder(storeFolder):
@@ -283,6 +285,7 @@ if __name__ == '__main__':
 	print ("Google Docs Backup v. %s"%__version)
 	print ("Python version %s [%s]"% (sys.version, platform.python_version()))
 	print ("Inspired (but with different approach) by GDataCopier, http://gdatacopier.googlecode.com/")
+	print ("Primary developped when migrating from Google Account to Google Apps Account (many docs of many users to migrate)")
 	parser = argparse.ArgumentParser(description='Standard exemple : gdocsbackup.py -l jdoe@gmail.com ',epilog="Have fun!")
 	parser.add_argument('-l', '--login')
 	parser.add_argument('-p', '--password', help="Warning : the password could be stored in your console history (OS dependant). You'd better not use the option and enter your password when asked by the program")
@@ -354,4 +357,5 @@ if __name__ == '__main__':
 	downloadFeed(client, client.auth_token, gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken()), feed, folder, args.flat, args.ignore)
 	LOG.info ("Storing log in backup folder (contains important ownership and share infos, that you could use when re-importing documents)")
 	shutil.copy2('output.log', folder+"/output.log")
+	LOG.info (os.path.abspath(folder))
 	LOG.info ("SUCCESS!")
