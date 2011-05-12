@@ -1,5 +1,5 @@
-﻿# coding=<UTF-8>
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 # https://github.com/jgraglia/Google-Docs-Backup
 # Usage : python gdocsbackup.py -l xxx@xxxx.com [-p password]
 
@@ -33,6 +33,7 @@ try:
 	import shutil
 	import signal
 	import urllib
+	import re
 except:
 	print ("failed to find some basic python modules, please validate the environment")
 	exit(1)
@@ -159,19 +160,29 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 		else:
 			raise Exception("ERROR !!!!!!!! Type de document non géré : "+entry.GetDocumentType())
 		LOG.info ("---\"%s\" de type %s"%(entry.title.text.encode(sys.getfilesystemencoding()), entry.GetDocumentType()))
+		# regular expression to parse RFC3389
+		updated_time = datetime.datetime(*map(int, re.split('[^\d]', entry.updated.text)[:-1]))
+		date_string = updated_time.strftime('%b %d %Y %H:%M')
+		LOG.info ("   |- Timestamp : %s"%date_string)
+		#rights
+		LOG.info ("   |- Rights :")
+		aclFeed = client.GetAclPermissions(entry.resource_id.text)
+		for acl in aclFeed.entry:
+			LOG.info ('   |      |- '+acl.scope.value+' ('+acl.scope.type+') is '+acl.role.value)
+		LOG.info ("   |- Folders :")
 		for folder in entry.InFolders():
-			LOG.info ("   |- "+folder.title)
+			LOG.info ("   |      |-"+folder.title)
 		filenameToCreate= computeFileNameFor(entry, ext)
 		file = computeFileForEntry(client, stdToken, spreadsheetToken, storeFolder, entry, filenameToCreate, storeFlat, ignoreDualCollections)
 		
 		if dl:
-			LOG.info ("   |-----> DOWNLOADED")
-			LOG.info ("           \""+entry.title.text.encode(sys.getfilesystemencoding()) +"\" ["+entry.GetDocumentType()+"] : "+file)
+			LOG.info ("   |- > DOWNLOADED")
+			LOG.info ("              \""+entry.title.text.encode(sys.getfilesystemencoding()) +"\" ["+entry.GetDocumentType()+"] : "+file)
 			client.auth_token = stdToken
 			client.Download(entry, os.path.abspath(file))
 		else:
-			LOG.info ("   |-----> EXPORTED")
-			LOG.info ("           \""+entry.title.text.encode(sys.getfilesystemencoding()) +"\" ["+entry.GetDocumentType()+"] : "+file)
+			LOG.info ("   |- > EXPORTED")
+			LOG.info ("              \""+entry.title.text.encode(sys.getfilesystemencoding()) +"\" ["+entry.GetDocumentType()+"] : "+file)
 			client.auth_token = spreadsheetToken
 			client.Export(entry, os.path.abspath(file))
 	LOG.info ("Stats : "+str(stats))
@@ -201,7 +212,7 @@ def computeArborescentFileForEntry(client, stdToken, spreadsheetToken, storeFold
 def isOwnerOfFolder(folderAsLink, login, stdToken, spreadsheetToken):
 	folderId = folderAsLink.href.split('/')[-1]
 	if args.verbose:
-		LOG.debug ("on essaye d'accéder à '"+folderAsLink.title+"' ("+folderId+") en tant que "+login)
+		LOG.debug ("Trying to access to folder '"+folderAsLink.title+"' ("+folderId+") as user :  "+login)
 	try:
 		client.auth_token = stdToken
 		folderAsGData = client.GetDoc(folderId)
@@ -280,7 +291,7 @@ if __name__ == '__main__':
 	parser.add_argument('-i', '--ignore', action="store_true", default=False)
 	parser.add_argument('-v', '--verbose', action = 'store_true', dest = 'verbose', default = False,	help = 'increase verbosity')	
 	parser.add_argument('-u', '--usage', action="store_true", default=False, help="show help and exit")
-	parser.add_argument('-U', '--update', action="store_true", default=False, help="Self update from "+__update_url+" and exit")
+	parser.add_argument('-U', '--update', action="store_true", default=False, help="Self update from "+__update_url+" then exit")
 	
 	args = parser.parse_args()
 
@@ -341,4 +352,6 @@ if __name__ == '__main__':
 	#client.auth_token = gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken())
 	login = args.login
 	downloadFeed(client, client.auth_token, gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken()), feed, folder, args.flat, args.ignore)
+	LOG.info ("Storing log in backup folder (contains important ownership and share infos, that you could use when re-importing documents)")
+	shutil.copy2('output.log', folder+"/output.log")
 	LOG.info ("SUCCESS!")
