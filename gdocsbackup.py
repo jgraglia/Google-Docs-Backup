@@ -305,7 +305,10 @@ if __name__ == '__main__':
 	setup_logger(args)
 
 	if args.update:
-		print ("Automatic update from %s to %s"% (__update_url, __file__))
+		print ("Automatic update from")
+		print ("%s"% __update_url)	
+		print ("to ")
+		print ("%s"%  __file__)	
 		raw_input("Press ENTER to overwrite current version, or CTRL+C to exit now!")
 		urllib.urlretrieve(__update_url, __file__)
 		print ("New version installed in %s"%__file__)
