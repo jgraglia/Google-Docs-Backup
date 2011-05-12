@@ -305,6 +305,7 @@ if __name__ == '__main__':
 	setup_logger(args)
 
 	if args.update:
+		print ("------------------------------------------------------")
 		print ("Automatic update from")
 		print ("%s"% __update_url)	
 		print ("to ")
