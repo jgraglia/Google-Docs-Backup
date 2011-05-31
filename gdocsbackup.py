@@ -34,6 +34,7 @@ try:
 	import signal
 	import urllib
 	import re
+	import time
 except:
 	print ("failed to find some basic python modules, please validate the environment")
 	exit(1)
@@ -54,7 +55,7 @@ except:
         exit(1)
 
 __update_url="https://github.com/jgraglia/Google-Docs-Backup/raw/master/gdocsbackup.py"
-__version=0.6
+__version=0.7
 	
 # copy from : GDataCopier, http://gdatacopier.googlecode.com/
 # windows problem :  "|*><?
@@ -109,10 +110,49 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 		LOG.info ("No entries in feed - Nothing to backup")
 	cleanStoreFolder(storeFolder)
 	forceFolder(storeFolder)
-	stats = {'doc':0, 'spreadsheet':0, 'impress':0, 'drawings':0, 'images':0, 'pdf':0, 'other':0}
+	stats = {'doc':0, 'spreadsheet':0, 'impress':0, 'drawings':0, 'images':0, 'pdf':0, 'other':0, 'error':0, 'shared':0}
 	for entry in feed.entry:
 		ext = ".pdf"
 		dl=False
+
+		LOG.info ("---\"%s\" de type %s"%(entry.title.text.encode(sys.getfilesystemencoding()), entry.GetDocumentType()))
+		# regular expression to parse RFC3389
+		updated_time = datetime.datetime(*map(int, re.split('[^\d]', entry.updated.text)[:-1]))
+		date_string = updated_time.strftime('%b %d %Y %H:%M')
+		LOG.info ("   |- Timestamp : %s"%date_string)
+		#rights
+		LOG.info ("   |- Rights :")
+		try:
+			client.auth_token = stdToken
+			aclFeed = client.GetAclPermissions(entry.resource_id.text)
+			sharedUserAlreadyWriter=False;
+			for acl in aclFeed.entry:
+				LOG.info ('   |      |- '+str(acl.scope.value)+' ('+str(acl.scope.type)+') is '+str(acl.role.value))
+				if str(acl.scope.value)==args.sharedUser and acl.role.value=="writer":
+					sharedUserAlreadyWriter=True
+
+			if not args.sharedUser == None :
+				if sharedUserAlreadyWriter:
+					LOG.info("      "+str(args.sharedUser)+" is already a writer of that doc. no need to add new ACL ")
+				else:
+					LOG.info("      Adding 'writer' ACL to : "+args.sharedUser)
+					if not args.dryRun:
+						newScope = gdata.acl.data.AclScope(value=sharedUser, type='user')
+						newRole = gdata.acl.data.AclRole(value='writer')
+						newAcl_entry = gdata.docs.data.Acl(scope=newScope, role=newRole)
+						created_acl_entry = client.Post(newAcl_entry, entry.GetAclLink().href)
+
+						aclFeed = client.GetAclPermissions(entry.resource_id.text)
+						for acl in aclFeed.entry:
+							LOG.info ('   |      |- '+str(acl.scope.value)+' ('+str(acl.scope.type)+') is '+str(acl.role.value))
+					stats['shared']+=1
+		except gdata.client.Unauthorized as error:
+			LOG.error("   |  |- CAN'T DISPLAY ACL FOR DOCUMENT : {0}".format(error))
+
+		LOG.info ("   |- Folders :")
+		for folder in entry.InFolders():
+			LOG.info ("   |      |-"+folder.title)
+
 		if entry.GetDocumentType()== "document" :
 			ext = ".doc"
 			stats['doc']+=1
@@ -123,7 +163,7 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 			ext =".svg"
 			stats['drawings']+=1
 			logInReportFile(storeFolder, ". "+entry.title.text.encode(sys.getfilesystemencoding())+" : Google can export drawing as SVG file, but can't reimport them! This is terrible!\n")
-			logInReportFile(storeFolder, "    The only option I'm aware is to share the docs, then make a copy in order to get ownership\n")
+			logInReportFile(storeFolder, "    The only option I'm aware is to share the docs, then make a copy in order to get ownership (because Google can't transfer ownership among domains !! Grrr!!)\n")
 		elif entry.GetDocumentType() == "spreadsheet":
 			ext =".xls"
 			stats['spreadsheet']+=1
@@ -151,6 +191,10 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 			ext =""
 			dl=True		
 			stats['images']+=1			    
+		elif entry.GetDocumentType() == "image/svg+xml":
+			ext =""
+			dl=True		
+			stats['images']+=1			    
 		elif entry.GetDocumentType() == "text/xml":
 			ext =""
 			dl=True			    
@@ -160,35 +204,37 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 			dl=True			    
 			stats['other']+=1			    
 		else:
-			raise Exception("ERROR !!!!!!!! Type de document non géré : "+entry.GetDocumentType())
-		LOG.info ("---\"%s\" de type %s"%(entry.title.text.encode(sys.getfilesystemencoding()), entry.GetDocumentType()))
-		# regular expression to parse RFC3389
-		updated_time = datetime.datetime(*map(int, re.split('[^\d]', entry.updated.text)[:-1]))
-		date_string = updated_time.strftime('%b %d %Y %H:%M')
-		LOG.info ("   |- Timestamp : %s"%date_string)
-		#rights
-		LOG.info ("   |- Rights :")
-		aclFeed = client.GetAclPermissions(entry.resource_id.text)
-		for acl in aclFeed.entry:
-			LOG.info ('   |      |- '+acl.scope.value+' ('+acl.scope.type+') is '+acl.role.value)
-		LOG.info ("   |- Folders :")
-		for folder in entry.InFolders():
-			LOG.info ("   |      |-"+folder.title)
+			if (args.skip):
+				LOG.error("   |- content type ("+entry.GetDocumentType()+") is not handled, and skip option is set : DOCUMENT WILL BE SKIPPED ie. NOT SAVED!");
+				continue
+			else:
+				raise Exception("ERROR !!!!!!!! Type de document non géré : "+entry.GetDocumentType())
 		filenameToCreate= computeFileNameFor(entry, ext)
 		file = computeFileForEntry(client, stdToken, spreadsheetToken, storeFolder, entry, filenameToCreate, storeFlat, ignoreDualCollections)
 		
-		if dl:
-			LOG.info ("   |- > DOWNLOADED")
-			LOG.info ("              \""+entry.title.text.encode(sys.getfilesystemencoding()) +"\" ["+entry.GetDocumentType()+"] : "+file)
-			client.auth_token = stdToken
-			client.Download(entry, os.path.abspath(file))
-		else:
-			LOG.info ("   |- > EXPORTED")
-			LOG.info ("              \""+entry.title.text.encode(sys.getfilesystemencoding()) +"\" ["+entry.GetDocumentType()+"] : "+file)
-			client.auth_token = spreadsheetToken
-			client.Export(entry, os.path.abspath(file))
+		try:
+			if not args.dryRun:
+				if dl:
+					LOG.info ("   |- > DOWNLOADING...")
+					LOG.info ("              \""+entry.title.text.encode(sys.getfilesystemencoding()) +"\" ["+entry.GetDocumentType()+"] : "+file)
+					client.auth_token = stdToken
+					client.Download(entry, os.path.abspath(file))
+				else:
+					LOG.info ("   |- > EXPORTING...")
+					LOG.info ("              \""+entry.title.text.encode(sys.getfilesystemencoding()) +"\" ["+entry.GetDocumentType()+"] : "+file)
+					client.auth_token = spreadsheetToken
+					client.Export(entry, os.path.abspath(file))
+		except gdata.client.RequestError as error:
+			stats['error']+=1
+			if args.skip:
+				LOG.error ("         ERROR :{0}".format(error))
+			else:
+				raise
+		LOG.info ("   |- >                      ...DONE")
+		time.sleep(1)
 	LOG.info ("Stats : "+str(stats))
 	warnUserOfReportFileIfNecessary(storeFolder)
+	return stats
 
 def computeFileNameFor(entry, ext):
 	return sanatize_filename(entry.title.text)+ext
@@ -295,6 +341,11 @@ if __name__ == '__main__':
 	parser.add_argument('-v', '--verbose', action = 'store_true', dest = 'verbose', default = False,	help = 'increase verbosity')	
 	parser.add_argument('-u', '--usage', action="store_true", default=False, help="show help and exit")
 	parser.add_argument('-U', '--update', action="store_true", default=False, help="Self update from "+__update_url+" then exit")
+	parser.add_argument('-s', '--skip', action="store_true", default=False, help="Skip unknown content type (data will NOT be copied!")
+	parser.add_argument('-D', '--debug', action="store_true", default=False, help="Active full debug")
+	parser.add_argument('-S', '--sharedUser', help="email of google account to share MY docs with")
+	parser.add_argument('--dryRun',action="store_true", default=False,  help="dry run : no copy, no shared. read only")
+
 	
 	args = parser.parse_args()
 
@@ -340,16 +391,27 @@ if __name__ == '__main__':
 	if args.flat==False:
 		LOG.info ("Ignorer si multi collections : "+ ("IGNORER" if args.ignore else "LANCER UNE ERREUR"))
 	if args.verbose==True:
-		LOG.info ("Mode debug                   : ACTIVE")
+		LOG.info("Verbose Mode                 : ACTIVE")
+	if args.debug==True:
+		LOG.info("Debug Mode                   : ACTIVE")
+	if args.skip==True:
+		LOG.info("Skip unknown content         : ACTIVE")
+	if not args.sharedUser==None:
+		LOG.info("Be careful, all you OWNED DOCUMENTS will be shared with '"+args.sharedUser+"' - Please confirm (y) or die")
+		confirmShared = raw_input("Confirm that you understand that your private doc will be shared with '"+args.sharedUser+"' google user (y|Y) or die : ")
+		if not confirmShared.lower() == "y" and not confirmShared.lower() == "yes":
+			exit(1)
+	if args.dryRun:
+		LOG.info("Dry Run enabled - No modification will be made to your documents")	
 	LOG.info ("System Encoding              : %s"%sys.getfilesystemencoding())
 	LOG.info ("====================================================================")
 	LOG.info ("ATTENTION : SEUL LES DOCUMENTS APPARTENANT A "+args.login+" SERONT RECUPERES !!!")
 	LOG.info ("====================================================================")
 	raw_input("ENTREE pour continuer, ou CTRL+C pour annuler...")
 	LOG.info ("Connexion sur le serveur Google...")
-	client = gdata.docs.client.DocsClient(source=args.login)
+	client = gdata.docs.client.DocsClient(source="jgraglia-gdocsbackup-v1")
 	client.ssl = True 
-	client.http_client.debug = False
+	client.http_client.debug = args.debug
 	client.ClientLogin(args.login, args.password, client.source);
 	LOG.info ("    -> succès")
 	LOG.info ("Récupération de la liste des documents appartenant à %s"%args.login)
@@ -358,8 +420,13 @@ if __name__ == '__main__':
 	spreadsheets_client.ClientLogin(args.login, args.password)
 	#client.auth_token = gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken())
 	login = args.login
-	downloadFeed(client, client.auth_token, gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken()), feed, folder, args.flat, args.ignore)
+	stats = downloadFeed(client, client.auth_token, gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken()), feed, folder, args.flat, args.ignore)
 	LOG.info ("Storing log in backup folder (contains important ownership and share infos, that you could use when re-importing documents)")
 	shutil.copy2('output.log', folder+"/output.log")
 	LOG.info (os.path.abspath(folder))
-	LOG.info ("SUCCESS!")
+	if not args.sharedUser == None:
+		LOG.info(str(stats['shared'])+" document(s) where shared with user "+str(args.sharedUser))
+	if stats['error']>0:
+		LOG.error("ERROR ! "+str(stats['error'])+" error(s) occured, some document aren't stored. See output.log for details")
+	else:
+		LOG.info ("SUCCESS !")
