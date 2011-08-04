@@ -259,12 +259,12 @@ if __name__ == '__main__':
 	print ("Python version %s [%s]"% (sys.version, platform.python_version()))
 	print ("Developped while migrating documents of standard Google accounts to Google Apps Domain accounts")
 	parser = argparse.ArgumentParser(description='Standard exemple : gtransfer.py -l olduser%domain.com@gtempaccount.com -o olduser@domain.com',epilog="Have fun!")
-	parser.add_argument('-l', '--login')
+	parser.add_argument('-l', '--login', required=True)
 	parser.add_argument('-d', '--directory', help="Where to store you document. If not provided, will use a default localtion based on login and date")
 	parser.add_argument('-v', '--verbose', action = 'store_true', dest = 'verbose', default = False,	help = 'increase verbosity')	
 	parser.add_argument('-u', '--usage', action="store_true", default=False, help="show help and exit")
 	parser.add_argument('-U', '--update', action="store_true", default=False, help="Self update from "+__update_url+" then exit")
-	parser.add_argument('-o', '--newOwner', help="New owner of documents")
+	parser.add_argument('-o', '--newOwner', help="New owner of documents", required=True)
 	parser.add_argument('--dryRun',action="store_true", default=False,  help="dry run : no copy, no share. Read only!")
 	
 	args = parser.parse_args()
@@ -302,18 +302,21 @@ if __name__ == '__main__':
 	LOG.info("New owner of my documents     : "+args.newOwner)
 	LOG.info ("System Encoding              : %s"%sys.getfilesystemencoding())
 	LOG.info("===============================================")
-	LOG.info("will transfer ALL docs and SHARE of "+args.login+" to accouunt "+args.newOwner)
+	LOG.info("will transfer ALL docs and SHARE of "+args.login+" to account "+args.newOwner)
+	LOG.warning("Some informations will be lost during the transfer : here is a non complete list of lost informations : ");
+	LOG.warning("versions, comments, revisions, history...");
+	LOG.warning("USE WITH EXTREME CAUTION AND AT YOUR OWN RISK !");
 	LOG.info("===============================================")
-	raw_input("ENTER TO CONTINUE OR CTRL+C TO CANCEL...")
-	LOG.info ("Connecting with google account  : "+args.login)
-	oldOwner = gdata.docs.client.DocsClient(source="jgraglia-gdocsbackup-v1")
+	raw_input("IF YOU HAVE UNDERSTOOD THE RISK AND ARE READY TO START TRANSFER PROCESS, PRESS ENTER TO CONTINUE OR CTRL+C TO CANCEL...")
+	LOG.info ("Connecting with OLD google account  : "+args.login)
+	oldOwner = gdata.docs.client.DocsClient(source="jgraglia-gtransfer-v1")
 	oldOwner.ssl = True 
 	oldOwner.http_client.debug = args.verbose
 	oldOwner.ClientLogin(args.login, oldOwnerPassword, oldOwner.source);
 	LOG.info ("    -> success")
 
-	LOG.info ("Connecting with google account  : "+args.newOwner)
-	newOwner = gdata.docs.client.DocsClient(source="jgraglia-gdocsbackup-v1")
+	LOG.info ("Connecting with NEW google account  : "+args.newOwner)
+	newOwner = gdata.docs.client.DocsClient(source="jgraglia-gtransfer-v1")
 	newOwner.ssl = True 
 	newOwner.http_client.debug = args.verbose
 	newOwner.ClientLogin(args.newOwner, newOwnerPassword, newOwner.source);
@@ -328,20 +331,20 @@ if __name__ == '__main__':
 	doStep4=True
 	stats = {'removeoldownerright':0, 'addwriter':0, 'copied':0, 'step4':0}
 	if doStep1:
-		LOG.info("1/ Adding writer rigthts to "+args.newOwner+" to ALL documents of "+args.login)
+		LOG.info("1/ Adding writer rigthts to "+args.newOwner+" (NEW) to ALL documents of "+args.login+" (OLD)")
 		for entry in oldDocsFeed.entry:
 			addWriterShare(oldOwner, entry, args.newOwner)
 		LOG.info("Stats:"+str(stats))
 
 	if doStep2:
-		LOG.info("2/ Removing "+args.login+" rights on ALL non owned documents")
+		LOG.info("2/ Removing "+args.login+" (OLD) rights on ALL non owned documents")
 		oldDocsFeed = oldOwner.GetDocList(uri='/feeds/default/private/full/')
 		for entry in oldDocsFeed.entry:
 			removeAllRightsIfNotOwned(oldOwner, entry, args.login)
 		LOG.info("Stats:"+str(stats))
 
 	if doStep3:
-		LOG.info("3/ Copying docs owned by "+args.login+" on account "+args.newOwner+" in order to get ownership (can't transfer ownership among domains")
+		LOG.info("3/ Copying docs of account "+args.newOwner+" (NEW) currently owned by "+args.login+" (OLD) in order to get ownership (can't transfer ownership among domains!GRrr!)")
 		newDocsFeed = newOwner.GetDocList(uri='/feeds/default/private/full/')
 		for entry in newDocsFeed.entry:
 			if isOwner(newOwner, entry, args.login):
@@ -350,7 +353,7 @@ if __name__ == '__main__':
 		LOG.info("Stats:"+str(stats))
 
 	if doStep4:
-		LOG.info("4/ Removing all remaing rights of "+args.login)
+		LOG.info("4/ Removing all remaing rights of "+args.login+" (OLD)")
 		oldDocsFeed = oldOwner.GetDocList(uri='/feeds/default/private/full/')
 		for entry in oldDocsFeed.entry:
 			removeAllRightsExceptMine(oldOwner, entry, args.login)
