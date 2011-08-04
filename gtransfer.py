@@ -356,6 +356,6 @@ if __name__ == '__main__':
 			removeAllRightsExceptMine(oldOwner, entry, args.login)
 	
 	if args.dryRun:
-		LOG.info("DRY RUN : no modifications where applied!")
+		LOG.info("DRY RUN : no modifications were applied!")
 	LOG.info("Stats:"+str(stats))
 	LOG.info ("Done !")
