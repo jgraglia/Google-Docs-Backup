@@ -343,8 +343,8 @@ if __name__ == '__main__':
 	parser.add_argument('-U', '--update', action="store_true", default=False, help="Self update from "+__update_url+" then exit")
 	parser.add_argument('-s', '--skip', action="store_true", default=False, help="Skip unknown content type (data will NOT be copied!")
 	parser.add_argument('-D', '--debug', action="store_true", default=False, help="Active full debug")
-	parser.add_argument('-S', '--sharedUser', help="email of google account to share MY docs with")
-	parser.add_argument('--dryRun',action="store_true", default=False,  help="dry run : no copy, no shared. read only")
+	parser.add_argument('-S', '--sharedUser', help="Google account to share all MY docs with")
+	parser.add_argument('--dryRun',action="store_true", default=False,  help="dry run : no copy, no share. Read only!")
 
 	
 	args = parser.parse_args()
