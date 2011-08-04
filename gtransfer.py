@@ -170,7 +170,18 @@ def addWriterShare(client, entry, login):
 			newScope = gdata.acl.data.AclScope(value=login, type='user')
 			newRole = gdata.acl.data.AclRole(value="writer")
 			newAcl_entry = gdata.docs.data.Acl(scope=newScope, role=newRole)
-			created_acl_entry = client.Post(newAcl_entry, entry.GetAclLink().href)
+			try :
+				created_acl_entry = client.Post(newAcl_entry, entry.GetAclLink().href)
+			except gdata.client.RequestError as error :
+				LOG.error("Error "+str(error));
+				LOG.error ("Error: {0}".format(error))
+				LOG.error("Current ACL for entry")
+				for acl in aclFeed.entry:
+					LOG.error("        acl : "+str(acl.scope.value)+' ('+str(acl.scope.type)+') is '+str(acl.role.value)+' of '+entry.title.text.encode(sys.getfilesystemencoding()))
+				if sys.version_info >= (3, 0):
+					input("You can abort now (CTRL+C), or press ENTER when error is resolved")
+				else:
+					raw_input("You can abort now(CTRL+C), or press ENTER when error is resolved")
 		stats['addwriter']+=1
 
 def removeAllRightsExceptMine(client, entry, targetLogin):
@@ -181,7 +192,7 @@ def removeAllRightsExceptMine(client, entry, targetLogin):
 			LOG.info("        removing acl : "+str(acl.scope.value)+' ('+str(acl.scope.type)+') is '+str(acl.role.value)+' of '+entry.title.text.encode(sys.getfilesystemencoding()))
 			if not args.dryRun:
 				client.Delete(acl, force=True)
-			stats['step4']+=1
+			stats['removeAllRightsExceptMine']+=1
 
 def removeAllRightsIfNotOwned(client, entry, targetLogin):
 	if not isOwner(client, entry, targetLogin):
@@ -308,6 +319,10 @@ if __name__ == '__main__':
 	LOG.warning("USE WITH EXTREME CAUTION AND AT YOUR OWN RISK !");
 	LOG.info("===============================================")
 	raw_input("IF YOU HAVE UNDERSTOOD THE RISK AND ARE READY TO START TRANSFER PROCESS, PRESS ENTER TO CONTINUE OR CTRL+C TO CANCEL...")
+	LOG.info("TIP : in order to easier the migration process, you should open a page with the google Documents of yout old account.")
+	LOG.info("      an keep it (screen capture, save as pdf..) : it will be simpler to reorganize docs of the new account after the transfer process")
+	LOG.info("===============================================")
+	raw_input("Ok, this is the last time I bother you with warnings and others questions. Press ENTER and it will start!")
 	LOG.info ("Connecting with OLD google account  : "+args.login)
 	oldOwner = gdata.docs.client.DocsClient(source="jgraglia-gtransfer-v1")
 	oldOwner.ssl = True 
@@ -329,7 +344,7 @@ if __name__ == '__main__':
 	doStep2=True
 	doStep3=True
 	doStep4=True
-	stats = {'removeoldownerright':0, 'addwriter':0, 'copied':0, 'step4':0}
+	stats = {'removeoldownerright':0, 'addwriter':0, 'copied':0, 'removeAllRightsExceptMine':0}
 	if doStep1:
 		LOG.info("1/ Adding writer rigthts to "+args.newOwner+" (NEW) to ALL documents of "+args.login+" (OLD)")
 		for entry in oldDocsFeed.entry:
@@ -361,4 +376,9 @@ if __name__ == '__main__':
 	if args.dryRun:
 		LOG.info("DRY RUN : no modifications were applied!")
 	LOG.info("Stats:"+str(stats))
-	LOG.info ("Done !")
+	LOG.info("Done !")
+	LOG.info("Now you can recreate the missing collections in the new acccount ("+args.newOwner+")")
+	LOG.info("  You can look at what exists on your old account. This account should contains only collections")
+	LOG.info("And after, you can close your old account : ")
+	LOG.info("  Go to : https://www.google.com/accounts/ManageAccount whith your OLD account")
+	LOG.info("Near 'My products' click on 'Modify' you should be at https://www.google.com/accounts/EditServices")
