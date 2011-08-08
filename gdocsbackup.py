@@ -253,7 +253,7 @@ def computeArborescentFileForEntry(client, stdToken, spreadsheetToken, storeFold
 	if firstFolder==None:
 		return os.path.join(os.path.abspath(storeFolder), filenameToCreate)
 	else:				
-		colFolder = os.path.join(os.path.abspath(storeFolder), firstFolder.title)
+		colFolder = os.path.join(os.path.abspath(storeFolder), firstFolder.title.encode(sys.getfilesystemencoding()))
 		forceFolder(colFolder)
 		return os.path.join(os.path.abspath(colFolder), filenameToCreate)
 
