@@ -156,6 +156,13 @@ def isOwnerOfFolder(folderAsLink, login, stdToken, spreadsheetToken):
 		LOG.error ("Error: {0}".format(error))
 		return False	
 
+def logAndProposeAbort(error):
+	LOG.error("Error "+str(error));
+	LOG.error ("Error: {0}".format(error))
+	if sys.version_info >= (3, 0):
+		input("You can abort now (CTRL+C), or press ENTER when the error is resolved")
+	else:
+		raw_input("You can abort now(CTRL+C), or press ENTER when the error is resolved")
 
 def addWriterShare(client, entry, login):
 	aclFeed = client.GetAclPermissions(entry.resource_id.text)
@@ -173,15 +180,10 @@ def addWriterShare(client, entry, login):
 			try :
 				created_acl_entry = client.Post(newAcl_entry, entry.GetAclLink().href)
 			except gdata.client.RequestError as error :
-				LOG.error("Error "+str(error));
-				LOG.error ("Error: {0}".format(error))
 				LOG.error("Current ACL for entry")
 				for acl in aclFeed.entry:
 					LOG.error("        acl : "+str(acl.scope.value)+' ('+str(acl.scope.type)+') is '+str(acl.role.value)+' of '+entry.title.text.encode(sys.getfilesystemencoding()))
-				if sys.version_info >= (3, 0):
-					input("You can abort now (CTRL+C), or press ENTER when error is resolved")
-				else:
-					raw_input("You can abort now(CTRL+C), or press ENTER when error is resolved")
+				logAndProposeAbort(error)
 		stats['addwriter']+=1
 
 def removeAllRightsExceptMine(client, entry, targetLogin):
@@ -191,7 +193,10 @@ def removeAllRightsExceptMine(client, entry, targetLogin):
 		if not acl.scope.value==targetLogin:
 			LOG.info("        removing acl : "+str(acl.scope.value)+' ('+str(acl.scope.type)+') is '+str(acl.role.value)+' of '+entry.title.text.encode(sys.getfilesystemencoding()))
 			if not args.dryRun:
-				client.Delete(acl, force=True)
+				try:
+					client.Delete(acl, force=True)
+				except gdata.client.RequestError as error :
+					logAndProposeAbort(error)
 			stats['removeAllRightsExceptMine']+=1
 
 def removeAllRightsIfNotOwned(client, entry, targetLogin):
@@ -202,7 +207,10 @@ def removeAllRightsIfNotOwned(client, entry, targetLogin):
 			if acl.scope.value==targetLogin:
 				LOG.info("        removing acl : "+str(acl.scope.value)+' ('+str(acl.scope.type)+') is '+str(acl.role.value)+' of '+entry.title.text.encode(sys.getfilesystemencoding()))
 				if not args.dryRun:
-					client.Delete(acl, force=True)
+					try:
+						client.Delete(acl, force=True)
+					except gdata.client.RequestError as error :
+						logAndProposeAbort(error)
 				stats['removeoldownerright']+=1
 	else:
 		LOG.debug("   - Keeping safe owner doc of "+targetLogin+" : "+entry.title.text.encode(sys.getfilesystemencoding()))
@@ -218,24 +226,30 @@ def makeCopy(client, entry, oldLogin, newLogin):
 	if canTransferOwnership(entry):
 		LOG.info("Copying : "+str(entry.title.text.encode(sys.getfilesystemencoding())))
 		if not args.dryRun:
-			duplicated_entry = client.Copy(entry, entry.title.text.encode(sys.getfilesystemencoding()))
-			stats['copied']+=1
-			#now recopying same righs on duplicated entry
-			aclFeed = client.GetAclPermissions(entry.resource_id.text)
-			for acl in aclFeed.entry:
-				if acl.scope.value==oldLogin:
-					continue
-				if acl.scope.value==newLogin:
-					continue
-				LOG.info("        duplicating acl : "+str(acl.scope.value)+' ('+str(acl.scope.type)+') is '+str(acl.role.value)+' from '+entry.title.text.encode(sys.getfilesystemencoding())+" to "+duplicated_entry.title.text.encode(sys.getfilesystemencoding()))
+			try:
+				duplicated_entry = client.Copy(entry, entry.title.text.encode(sys.getfilesystemencoding()))
+				stats['copied']+=1
+				#now recopying same righs on duplicated entry
+				aclFeed = client.GetAclPermissions(entry.resource_id.text)
+				for acl in aclFeed.entry:
+					if acl.scope.value==oldLogin:
+						continue
+					if acl.scope.value==newLogin:
+						continue
+					try:
+						LOG.info("        duplicating acl : "+str(acl.scope.value)+' ('+str(acl.scope.type)+') is '+str(acl.role.value)+' from '+entry.title.text.encode(sys.getfilesystemencoding())+" to "+duplicated_entry.title.text.encode(sys.getfilesystemencoding()))
 
-				newScope = gdata.acl.data.AclScope(value=str(acl.scope.value), type='user')
-				newRole = gdata.acl.data.AclRole(value=str(acl.role.value))
-				newAcl_entry = gdata.docs.data.Acl(scope=newScope, role=newRole)
-				LOG.info("        dup=             : "+str(newAcl_entry.scope.value)+' ('+str(newAcl_entry.scope.type)+') is '+str(newAcl_entry.role.value))
-				created_acl_entry = client.Post(newAcl_entry, duplicated_entry.GetAclLink().href)
+						newScope = gdata.acl.data.AclScope(value=str(acl.scope.value), type='user')
+						newRole = gdata.acl.data.AclRole(value=str(acl.role.value))
+						newAcl_entry = gdata.docs.data.Acl(scope=newScope, role=newRole)
+						LOG.info("        dup=             : "+str(newAcl_entry.scope.value)+' ('+str(newAcl_entry.scope.type)+') is '+str(newAcl_entry.role.value))
+						created_acl_entry = client.Post(newAcl_entry, duplicated_entry.GetAclLink().href)
+					except gdata.client.RequestError as error :
+						logAndProposeAbort(error)
+			except gdata.client.RequestError as error :
+				logAndProposeAbort(error)
 	else:
-		LOG.error("Manual copy required for "+entry.title.text.encode(sys.getfilesystemencoding())+" of type : "+entry.getDocumentType())
+		LOG.error("Manual copy required for "+entry.title.text.encode(sys.getfilesystemencoding()))
 		raw_input("Press a key when done")
 
 
@@ -319,7 +333,7 @@ if __name__ == '__main__':
 	LOG.warning("USE WITH EXTREME CAUTION AND AT YOUR OWN RISK !");
 	LOG.info("===============================================")
 	raw_input("IF YOU HAVE UNDERSTOOD THE RISK AND ARE READY TO START TRANSFER PROCESS, PRESS ENTER TO CONTINUE OR CTRL+C TO CANCEL...")
-	LOG.info("TIP : in order to easier the migration process, you should open a page with the google Documents of yout old account.")
+	LOG.info("TIP : in order to easier the migration process, you should open a page with the google Documents of your old account.")
 	LOG.info("      an keep it (screen capture, save as pdf..) : it will be simpler to reorganize docs of the new account after the transfer process")
 	LOG.info("===============================================")
 	raw_input("Ok, this is the last time I bother you with warnings and others questions. Press ENTER and it will start!")
@@ -368,7 +382,7 @@ if __name__ == '__main__':
 		LOG.info("Stats:"+str(stats))
 
 	if doStep4:
-		LOG.info("4/ Removing all remaing rights of "+args.login+" (OLD)")
+		LOG.info("4/ Removing all remaining rights of "+args.login+" (OLD)")
 		oldDocsFeed = oldOwner.GetDocList(uri='/feeds/default/private/full/')
 		for entry in oldDocsFeed.entry:
 			removeAllRightsExceptMine(oldOwner, entry, args.login)
