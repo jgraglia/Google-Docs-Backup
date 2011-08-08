@@ -1,4 +1,18 @@
-Simple Python Script to export automatically all the Google Docs that I own (crontab...)
+gdocsbackup.py
+	Simple Python Scripts to export automatically all the Google Docs that I own (crontab...)
+	NOTE : this is only an export of the document. Due to some limitations on Google Docs service
+	some kind of "Documents" can't be re-imported back.
+	Drawings are exported in .svg format, useable in Inkscape or another svg editor.
+	But when you reimport .svg files in Google Documents, a simple "dumb" file will be created, 
+	not a "Drawing" one.. so you lose all svg stuff, it's just a simple flat picture.. Ouch!
+
+gtransfer.py	
+	A more advanced script to easier the process of migration from a standard "Google docs" account
+	to a new "Google App Pro" account. Google does not allow simple migration of document, you have to do it
+	manually or use this script.
+	Basically, it will make a copy of each of your owned docs of your old account in your new account.
+	Be sure to read all the limitations (versions are lost..) before using it!
+	I have successfully proceed to the migration of 20+ more accounts with this script.
 
 You will need : 
 
