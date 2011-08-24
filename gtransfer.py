@@ -159,6 +159,9 @@ def isOwnerOfFolder(folderAsLink, login, stdToken, spreadsheetToken):
 def logAndProposeAbort(error):
 	LOG.error("Error "+str(error));
 	LOG.error ("Error: {0}".format(error))
+	proposeAbort()
+
+def proposeAbort():
 	if sys.version_info >= (3, 0):
 		input("You can abort now (CTRL+C), or press ENTER when the error is resolved")
 	else:
@@ -364,7 +367,9 @@ if __name__ == '__main__':
 		for entry in oldDocsFeed.entry:
 			addWriterShare(oldOwner, entry, args.newOwner)
 		LOG.info("Stats:"+str(stats))
-
+		LOG.info("Please confirm that you curently have "+stats['addwriter']+" documents in your (old) Google account "+args.login)
+		LOG.info("If not, this is an error.. Sorry!")
+		proposeAbort()
 	if doStep2:
 		LOG.info("2/ Removing "+args.login+" (OLD) rights on ALL non owned documents")
 		oldDocsFeed = oldOwner.GetDocList(uri='/feeds/default/private/full/')
