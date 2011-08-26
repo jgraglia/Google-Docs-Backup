@@ -100,7 +100,6 @@ if __name__ == '__main__':
 
 	LOG.info ("Listing all docs of %s"%args.login)
 	oldDocsFeed = oldOwner.GetDocList(uri='/feeds/default/private/full/')
-	
 
 	LOG.info ("ACCOUNT DOCUMENT LIST:")
 	count=0
