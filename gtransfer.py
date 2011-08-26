@@ -167,6 +167,12 @@ def proposeAbort():
 	else:
 		raw_input("You can abort now(CTRL+C), or press ENTER when the error is resolved")
 
+def pressAKeyToContinue():
+	if sys.version_info >= (3, 0):
+		input("Enter to continue...")
+	else:
+		raw_input("Enter to continue...")
+
 def addWriterShare(client, entry, login):
 	aclFeed = client.GetAclPermissions(entry.resource_id.text)
 	needAdd=True
@@ -181,13 +187,16 @@ def addWriterShare(client, entry, login):
 			newRole = gdata.acl.data.AclRole(value="writer")
 			newAcl_entry = gdata.docs.data.Acl(scope=newScope, role=newRole)
 			try :
-				created_acl_entry = client.Post(newAcl_entry, entry.GetAclLink().href)
+				uri = entry.GetAclLink().href+"?send-notification-emails=true"
+				created_acl_entry = client.Post(newAcl_entry, uri)
+				stats['addwriter']+=1
 			except gdata.client.RequestError as error :
 				LOG.error("Current ACL for entry")
 				for acl in aclFeed.entry:
 					LOG.error("        acl : "+str(acl.scope.value)+' ('+str(acl.scope.type)+') is '+str(acl.role.value)+' of '+entry.title.text.encode(sys.getfilesystemencoding()))
 				logAndProposeAbort(error)
-		stats['addwriter']+=1
+		else:
+				stats['addwriter']+=1
 
 def removeAllRightsExceptMine(client, entry, targetLogin):
 	LOG.info ("   - Removing ALL rights of "+targetLogin+" on "+entry.title.text.encode(sys.getfilesystemencoding()))
@@ -198,9 +207,11 @@ def removeAllRightsExceptMine(client, entry, targetLogin):
 			if not args.dryRun:
 				try:
 					client.Delete(acl, force=True)
+					stats['removeAllRightsExceptMine']+=1
 				except gdata.client.RequestError as error :
 					logAndProposeAbort(error)
-			stats['removeAllRightsExceptMine']+=1
+			else:
+				stats['removeAllRightsExceptMine']+=1
 
 def removeAllRightsIfNotOwned(client, entry, targetLogin):
 	if not isOwner(client, entry, targetLogin):
@@ -212,9 +223,11 @@ def removeAllRightsIfNotOwned(client, entry, targetLogin):
 				if not args.dryRun:
 					try:
 						client.Delete(acl, force=True)
+						stats['removeoldownerright']+=1
 					except gdata.client.RequestError as error :
 						logAndProposeAbort(error)
-				stats['removeoldownerright']+=1
+				else:
+					stats['removeoldownerright']+=1
 	else:
 		LOG.debug("   - Keeping safe owner doc of "+targetLogin+" : "+entry.title.text.encode(sys.getfilesystemencoding()))
 
@@ -367,27 +380,27 @@ if __name__ == '__main__':
 		for entry in oldDocsFeed.entry:
 			addWriterShare(oldOwner, entry, args.newOwner)
 		LOG.info("Stats:"+str(stats))
-		LOG.info("Please confirm that you curently have "+stats['addwriter']+" documents in your (old) Google account "+args.login)
+		LOG.info("Please confirm that you curently have "+str(stats['addwriter'])+" documents in your (old) Google account "+args.login)
 		LOG.info("If not, this is an error.. Sorry!")
-		proposeAbort()
+		pressAKeyToContinue()
 	if doStep2:
 		LOG.info("2/ Removing "+args.login+" (OLD) rights on ALL non owned documents")
 		oldDocsFeed = oldOwner.GetDocList(uri='/feeds/default/private/full/')
 		for entry in oldDocsFeed.entry:
 			removeAllRightsIfNotOwned(oldOwner, entry, args.login)
 		LOG.info("Stats:"+str(stats))
-
 	if doStep3:
 		LOG.info("3/ Copying docs of account "+args.newOwner+" (NEW) currently owned by "+args.login+" (OLD) in order to get ownership (can't transfer ownership among domains!GRrr!)")
+		pressAKeyToContinue()
 		newDocsFeed = newOwner.GetDocList(uri='/feeds/default/private/full/')
 		for entry in newDocsFeed.entry:
 			if isOwner(newOwner, entry, args.login):
 				LOG.info("Processing doc owned by "+args.login+" : "+entry.title.text.encode(sys.getfilesystemencoding()))
 				makeCopy(newOwner, entry, args.login,args.newOwner)
 		LOG.info("Stats:"+str(stats))
-
 	if doStep4:
 		LOG.info("4/ Removing all remaining rights of "+args.login+" (OLD)")
+		pressAKeyToContinue()
 		oldDocsFeed = oldOwner.GetDocList(uri='/feeds/default/private/full/')
 		for entry in oldDocsFeed.entry:
 			removeAllRightsExceptMine(oldOwner, entry, args.login)
