@@ -297,7 +297,7 @@ def getFirstCollectionFolderFor(client, stdToken, spreadsheetToken, storeFolder,
 		else:
 			logInReportFile(storeFolder, "\""+entry.title.text.encode(sys.getfilesystemencoding())+"\"")
 			logInReportFile(storeFolder, " vous appartient, mais est stocké dans la collection partagée  ")
-			logInReportFile(storeFolder, "\""+folder.title+"\"")
+			logInReportFile(storeFolder, "\""+folder.title.encode(sys.getfilesystemencoding())+"\"")
 			logInReportFile(storeFolder, ". Vous devrez réimporter manuellement ce fichier dans cette collection partagée.")
 			logInReportFile(storeFolder, "\n")
 	return firstOwnedFolder
