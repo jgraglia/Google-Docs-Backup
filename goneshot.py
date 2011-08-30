@@ -300,10 +300,13 @@ def readId():
 		return raw_input("Target id : ").strip()
 
 def findEntry(docsFeed, id):
-	for entry in docsFeed.entry:
+	for entry in docsFeed:
 		if entry.title.text.encode(sys.getfilesystemencoding()) == id :
 			return entry
 	return None
+
+def compareDocsEntryOnName(a, b):
+        return cmp(a.title.text.lower(), b.title.text.lower())
 
 #http://code.google.com/intl/fr/apis/documents/docs/3.0/developers_guide_python.html#CopyingDocs
 if __name__ == '__main__':
@@ -381,7 +384,8 @@ if __name__ == '__main__':
 
 	LOG.info ("Retreiving all docs of %s"%args.login)
 	oldDocsFeed = oldOwner.GetDocList(uri='/feeds/default/private/full/')
-	
+	oldDocsFeed.sort(compareDocsEntryOnName)
+
 	stats = {'removeoldownerright':0, 'addwriter':0, 'copied':0, 'removeAllRightsExceptMine':0}
 
 '''	for entry in oldDocsFeed.entry:

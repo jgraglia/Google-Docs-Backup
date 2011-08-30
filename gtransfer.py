@@ -173,14 +173,17 @@ def pressAKeyToContinue():
 	else:
 		raw_input("Enter to continue...")
 
-def addWriterShare(client, entry, login):
+def isWriter(client, entry, login):
 	aclFeed = client.GetAclPermissions(entry.resource_id.text)
-	needAdd=True
 	for acl in aclFeed.entry:
 		if acl.role.value == "writer" and acl.scope.value== login:
-			needAdd=False
-			break
-	if needAdd:
+			return True
+	return False
+
+def addWriterShareIfNotAlready(client, entry, login):
+	if isWriter(client, entry, login):
+		LOG.info ("   - No need to add WRITER share to "+login+" on "+entry.title.text.encode(sys.getfilesystemencoding())+" : already Writer")
+	else:
 		LOG.info ("   - Adding WRITER share to "+login+" on "+entry.title.text.encode(sys.getfilesystemencoding()))
 		if not args.dryRun:
 			newScope = gdata.acl.data.AclScope(value=login, type='user')
@@ -192,6 +195,7 @@ def addWriterShare(client, entry, login):
 				stats['addwriter']+=1
 			except gdata.client.RequestError as error :
 				LOG.error("Current ACL for entry")
+				aclFeed = client.GetAclPermissions(entry.resource_id.text)
 				for acl in aclFeed.entry:
 					LOG.error("        acl : "+str(acl.scope.value)+' ('+str(acl.scope.type)+') is '+str(acl.role.value)+' of '+entry.title.text.encode(sys.getfilesystemencoding()))
 				logAndProposeAbort(error)
@@ -218,7 +222,7 @@ def removeAllRightsIfNotOwned(client, entry, targetLogin):
 		LOG.info ("   - Removing ALL rights of "+targetLogin+" on "+entry.title.text.encode(sys.getfilesystemencoding()))
 		aclFeed = client.GetAclPermissions(entry.resource_id.text)
 		for acl in aclFeed.entry:
-			if acl.scope.value==targetLogin:
+			if acl.scope.value == targetLogin:
 				LOG.info("        removing acl : "+str(acl.scope.value)+' ('+str(acl.scope.type)+') is '+str(acl.role.value)+' of '+entry.title.text.encode(sys.getfilesystemencoding()))
 				if not args.dryRun:
 					try:
@@ -228,8 +232,10 @@ def removeAllRightsIfNotOwned(client, entry, targetLogin):
 						logAndProposeAbort(error)
 				else:
 					stats['removeoldownerright']+=1
+		return True
 	else:
 		LOG.debug("   - Keeping safe owner doc of "+targetLogin+" : "+entry.title.text.encode(sys.getfilesystemencoding()))
+		return False
 
 def isOwner(client, entry, targetLogin):
 	aclFeed = client.GetAclPermissions(entry.resource_id.text)
@@ -244,7 +250,6 @@ def makeCopy(client, entry, oldLogin, newLogin):
 		if not args.dryRun:
 			try:
 				duplicated_entry = client.Copy(entry, entry.title.text.encode(sys.getfilesystemencoding()))
-				stats['copied']+=1
 				#now recopying same righs on duplicated entry
 				aclFeed = client.GetAclPermissions(entry.resource_id.text)
 				for acl in aclFeed.entry:
@@ -253,7 +258,7 @@ def makeCopy(client, entry, oldLogin, newLogin):
 					if acl.scope.value==newLogin:
 						continue
 					try:
-						LOG.info("        duplicating acl : "+str(acl.scope.value)+' ('+str(acl.scope.type)+') is '+str(acl.role.value)+' from '+entry.title.text.encode(sys.getfilesystemencoding())+" to "+duplicated_entry.title.text.encode(sys.getfilesystemencoding()))
+						LOG.info("        duplicating ACL : "+str(acl.scope.value)+' ('+str(acl.scope.type)+') is '+str(acl.role.value)+' from '+entry.title.text.encode(sys.getfilesystemencoding())+" to "+duplicated_entry.title.text.encode(sys.getfilesystemencoding()))
 
 						newScope = gdata.acl.data.AclScope(value=str(acl.scope.value), type='user')
 						newRole = gdata.acl.data.AclRole(value=str(acl.role.value))
@@ -261,8 +266,11 @@ def makeCopy(client, entry, oldLogin, newLogin):
 						LOG.info("        dup=             : "+str(newAcl_entry.scope.value)+' ('+str(newAcl_entry.scope.type)+') is '+str(newAcl_entry.role.value))
 						created_acl_entry = client.Post(newAcl_entry, duplicated_entry.GetAclLink().href)
 					except gdata.client.RequestError as error :
+						LOG.error('      duplicating ACL failed for '+str(acl.scope.value)+' ('+str(acl.scope.type)+') is '+str(acl.role.value)+' :: '+duplicated_entry.title.text.encode(sys.getfilesystemencoding()))
 						logAndProposeAbort(error)
+				stats['copied']+=1
 			except gdata.client.RequestError as error :
+				LOG.error("Copy failed for "+entry.title.text.encode(sys.getfilesystemencoding()))
 				logAndProposeAbort(error)
 	else:
 		LOG.error("Manual copy required for "+entry.title.text.encode(sys.getfilesystemencoding()))
@@ -292,6 +300,10 @@ def forceFolder(dir):
 	if not os.path.exists(dir):
 		os.makedirs(dir)
 	return dir
+
+def compareDocsEntryOnName(a, b):
+        return cmp(a.title.text.lower(), b.title.text.lower())
+
 
 #http://code.google.com/intl/fr/apis/documents/docs/3.0/developers_guide_python.html#CopyingDocs
 if __name__ == '__main__':
@@ -368,41 +380,86 @@ if __name__ == '__main__':
 	LOG.info ("    -> success")
 
 	LOG.info ("Retreiving all docs of %s"%args.login)
-	oldDocsFeed = oldOwner.GetDocList(uri='/feeds/default/private/full/')
+	oldDocsFeed = oldOwner.GetEverything(uri='/feeds/default/private/full/')
+	oldDocsFeed.sort(compareDocsEntryOnName)
 	
+	doStep0=True
 	doStep1=True
 	doStep2=True
 	doStep3=True
 	doStep4=True
 	stats = {'removeoldownerright':0, 'addwriter':0, 'copied':0, 'removeAllRightsExceptMine':0}
-	if doStep1:
-		LOG.info("1/ Adding writer rigthts to "+args.newOwner+" (NEW) to ALL documents of "+args.login+" (OLD)")
-		for entry in oldDocsFeed.entry:
-			addWriterShare(oldOwner, entry, args.newOwner)
-		LOG.info("Stats:"+str(stats))
-		LOG.info("Please confirm that you curently have "+str(stats['addwriter'])+" documents in your (old) Google account "+args.login)
+	sharedDocsCount=0
+	ownedDocsCount=0
+	if doStep0:
+		LOG.info("0/ Listing all docs (owned and shared) in order to perform sanity check among the transfer process")
+		LOG.info(str(len(oldDocsFeed))+" docs found")
+		for entry in oldDocsFeed:
+			if isOwner(oldOwner, entry, args.login):
+				ownedDocsCount+=1
+			else:
+				sharedDocsCount+=1
+			LOG.info(str(ownedDocsCount)+" owned / "+str(sharedDocsCount)+" shared..."+entry.title.text.encode(sys.getfilesystemencoding()))
+		LOG.info("Please confirm that you currently have "+str(ownedDocsCount)+" owned docs and "+str(sharedDocsCount)+" shared docs for a total of "+str(ownedDocsCount+sharedDocsCount)+" docs in your (old) Google account "+args.login)
+		LOG.info("(Collections aren't taken into account in theses figures)")
 		LOG.info("If not, this is an error.. Sorry!")
 		pressAKeyToContinue()
+		
+	if doStep1:
+		LOG.info("1/ Adding writer rigthts to "+args.newOwner+" (NEW) to ALL documents of "+args.login+" (OLD)")
+		pressAKeyToContinue()
+		LOG.info("Processing entries...")
+		for entry in oldDocsFeed:
+			addWriterShareIfNotAlready(oldOwner, entry, args.newOwner)
+		LOG.info("Stats:"+str(stats))
+		if stats['addwriter'] != (sharedDocsCount+ownedDocsCount) : 
+			LOG.error("Only "+str(stats['addwriter'])+" writer ACL added, expecting "+str(sharedDocsCount)+" + "+str(ownedDocsCount)+" = "+str(sharedDocsCount+ownedDocsCount)+" ACL added to new account")
+			proposeAbort()
+		
+	time.sleep(3)
+	
 	if doStep2:
 		LOG.info("2/ Removing "+args.login+" (OLD) rights on ALL non owned documents")
-		oldDocsFeed = oldOwner.GetDocList(uri='/feeds/default/private/full/')
-		for entry in oldDocsFeed.entry:
-			removeAllRightsIfNotOwned(oldOwner, entry, args.login)
+		pressAKeyToContinue()
+		LOG.info("Obtaining feed...")
+		oldDocsFeed = oldOwner.GetEverything(uri='/feeds/default/private/full/')
+		oldDocsFeed.sort(compareDocsEntryOnName)
+		processedDocs=0
+		for entry in oldDocsFeed:
+			if removeAllRightsIfNotOwned(oldOwner, entry, args.login):
+				processedDocs+=1
 		LOG.info("Stats:"+str(stats))
+		if processedDocs != (sharedDocsCount) : 
+			LOG.error("Only "+str(processedDocs)+" docs processed, expecting "+str(sharedDocsCount)+" + "+str(ownedDocsCount)+" = "+str(sharedDocsCount+ownedDocsCount))
+			proposeAbort()		
+			
+	time.sleep(3)
+		
 	if doStep3:
 		LOG.info("3/ Copying docs of account "+args.newOwner+" (NEW) currently owned by "+args.login+" (OLD) in order to get ownership (can't transfer ownership among domains!GRrr!)")
 		pressAKeyToContinue()
-		newDocsFeed = newOwner.GetDocList(uri='/feeds/default/private/full/')
-		for entry in newDocsFeed.entry:
+		LOG.info("Obtaining feed...")
+		newDocsFeed = newOwner.GetEverything(uri='/feeds/default/private/full/')
+		newDocsFeed.sort(compareDocsEntryOnName)
+
+		for entry in newDocsFeed:
 			if isOwner(newOwner, entry, args.login):
 				LOG.info("Processing doc owned by "+args.login+" : "+entry.title.text.encode(sys.getfilesystemencoding()))
 				makeCopy(newOwner, entry, args.login,args.newOwner)
 		LOG.info("Stats:"+str(stats))
+		if stats['copied'] != ownedDocsCount:
+			LOG.error("Only "+str(stats['copied'])+" docs copied in order to gain ownership, expecting "+str(ownedDocsCount)+" docs as listed in step 0")
+			proposeAbort()	
+		
+	time.sleep(3)
+	
 	if doStep4:
 		LOG.info("4/ Removing all remaining rights of "+args.login+" (OLD)")
 		pressAKeyToContinue()
-		oldDocsFeed = oldOwner.GetDocList(uri='/feeds/default/private/full/')
-		for entry in oldDocsFeed.entry:
+		LOG.info("Obtaining feed...")
+		oldDocsFeed = oldOwner.GetEverything(uri='/feeds/default/private/full/')
+		oldDocsFeed.sort(compareDocsEntryOnName)
+		for entry in oldDocsFeed:
 			removeAllRightsExceptMine(oldOwner, entry, args.login)
 	
 	if args.dryRun:

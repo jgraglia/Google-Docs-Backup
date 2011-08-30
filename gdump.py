@@ -80,6 +80,9 @@ def setup_logger(options):
     #LOG.warning("test : WARNING message")
     #LOG.error("test : ERROR message")
 
+def compareDocsEntryOnName(a, b):
+        return cmp(a.title.text.lower(), b.title.text.lower())
+
 if __name__ == '__main__':
 	signal.signal(signal.SIGINT, signal_handler)
 	parser = argparse.ArgumentParser()
@@ -99,11 +102,12 @@ if __name__ == '__main__':
 	LOG.info ("    -> success")
 
 	LOG.info ("Listing all docs of %s"%args.login)
-	oldDocsFeed = oldOwner.GetDocList(uri='/feeds/default/private/full/')
+	oldDocsFeed = oldOwner.GetEverything(uri='/feeds/default/private/full/')
+	oldDocsFeed.sort(compareDocsEntryOnName)
 
 	LOG.info ("ACCOUNT DOCUMENT LIST:")
 	count=0
-	for entry in oldDocsFeed.entry:
+	for entry in oldDocsFeed:
 		LOG.info ("   - >> "+entry.title.text.encode(sys.getfilesystemencoding()))
 		count+=1
 	LOG.info(str(count)+" documents found")

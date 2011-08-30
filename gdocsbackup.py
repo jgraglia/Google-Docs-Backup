@@ -104,14 +104,17 @@ def setup_logger(options):
     #LOG.warning("test : WARNING message")
     #LOG.error("test : ERROR message")
 
+def compareDocsEntryOnName(a, b):
+        return cmp(a.title.text.lower(), b.title.text.lower())
 
 def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFlat, ignoreDualCollections):
-	if not feed.entry:
+	feed.sort(compareDocsEntryOnName)
+	if len(feed) == 0:
 		LOG.info ("No entries in feed - Nothing to backup")
 	cleanStoreFolder(storeFolder)
 	forceFolder(storeFolder)
 	stats = {'doc':0, 'spreadsheet':0, 'impress':0, 'drawings':0, 'images':0, 'pdf':0, 'other':0, 'error':0, 'shared':0}
-	for entry in feed.entry:
+	for entry in feed:
 		ext = ".pdf"
 		dl=False
 
@@ -208,7 +211,7 @@ def downloadFeed(client, stdToken, spreadsheetToken, feed, storeFolder, storeFla
 				LOG.error("   |- content type ("+entry.GetDocumentType()+") is not handled, and skip option is set : DOCUMENT WILL BE SKIPPED ie. NOT SAVED!");
 				continue
 			else:
-				raise Exception("ERROR !!!!!!!! Type de document non géré : "+entry.GetDocumentType())
+				raise Exception("ERROR !!!!!!!! Can't handle that kind of : "+entry.GetDocumentType()+ " for entry "+entry.title.text.encode(sys.getfilesystemencoding())+" ( '--skip' option allow you to bypass this error)")
 		filenameToCreate= computeFileNameFor(entry, ext)
 		file = computeFileForEntry(client, stdToken, spreadsheetToken, storeFolder, entry, filenameToCreate, storeFlat, ignoreDualCollections)
 		
@@ -415,7 +418,7 @@ if __name__ == '__main__':
 	client.ClientLogin(args.login, args.password, client.source);
 	LOG.info ("    -> succès")
 	LOG.info ("Récupération de la liste des documents appartenant à %s"%args.login)
-	feed = client.GetDocList(uri='/feeds/default/private/full/-/mine')
+	feed = client.GetEverything(uri='/feeds/default/private/full/-/mine')
 	spreadsheets_client = gdata.spreadsheet.service.SpreadsheetsService()
 	spreadsheets_client.ClientLogin(args.login, args.password)
 	#client.auth_token = gdata.gauth.ClientLoginToken(spreadsheets_client.GetClientLoginToken())
